@@ -1,0 +1,54 @@
+party:
+  id: test-lorem-ipsum-party
+  name: "Lorem Ipsum Test Party"
+  invitation_blocks:
+    - template: "h1"
+      content: "Lorem Ipsum Test Party"
+    - template: "p"
+      content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."
+    - template: "p"
+      content: "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
+    - template: "h2"
+      content: "Event Details"
+    - template: "p"
+      content: "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo."
+    - template: "multiple_choice"
+      content: |
+        {
+          "label": "What activities interest you most? (Multiple Selection)",
+          "options": ["Dancing", "Board Games", "Karaoke", "Food & Drinks", "Networking", "Live Music"],
+          "public": true
+        }
+    - template: "p"
+      content: "Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt."
+    - template: "single_choice"
+      content: |
+        {
+          "label": "What time would work best for you?",
+          "options": ["Early Morning (8-10 AM)", "Late Morning (10-12 PM)", "Early Afternoon (12-3 PM)", "Late Afternoon (3-6 PM)", "Evening (6-9 PM)", "Late Night (9 PM+)"],
+          "public": true
+        }
+    - template: "h2"
+      content: "Food Preferences"
+    - template: "p"
+      content: "Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem."
+    - template: "multiple_choice"
+      content: |
+        {
+          "label": "Dietary restrictions or preferences? (Private)",
+          "options": ["Vegetarian", "Vegan", "Gluten-free", "Dairy-free", "Nut allergies", "No restrictions"],
+          "public": false
+        }
+    - template: "text_input"
+      content: |
+        {
+          "label": "Any specific food requests or suggestions?",
+          "public": true
+        }
+    - template: "p"
+      content: "Ut enim ad minima veniam, quis nostrum exercitationem ullam corporis suscipit laboriosam, nisi ut aliquid ex ea commodi consequatur. Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam nihil molestiae consequatur."
+
+guests:
+  - "354a58d2-814e-45bb-9be7-5bdd895f87d8"  # Alice
+  - "943f16e9-3de9-4810-8282-e7853649b083"  # Bob
+  - "46addae4-c880-4895-803f-87500829c3f6"  # Charlie

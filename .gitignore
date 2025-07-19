@@ -1,0 +1,6 @@
+# compiled rust code
+/target
+
+# production data
+/*.db
+/*.yaml

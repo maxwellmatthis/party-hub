@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Party Hub</title>
+    <script src="main.js" defer></script>
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Templates -->
+    <template id="error">
+        <p>Ein Fehler ist aufgetreten.</p>
+    </template>
+    <template id="multiple-choice">
+        <label></label>
+        <ul></ul>
+    </template>
+    <template id="multiple-choice-item">
+        <li>
+            <input type="checkbox">
+            <span></span>
+        </li>
+    </template>
+    <template id="single-choice">
+        <label></label>
+        <ul></ul>
+    </template>
+    <template id="single-choice-item">
+        <li>
+            <input type="radio">
+            <span></span>
+        </li>
+    </template>
+    <template id="text-input">
+        <label></label>
+        <input type="text">
+    </template>
+    <template id="number-input">
+        <label></label>
+        <input type="number">
+    </template>
+    <template id="public-stats">
+        <div class="public-stats">
+            <h4>Andere Rückmeldungen:</h4>
+            <div class="other-responses">
+                <!-- Response items will be added here -->
+            </div>
+        </div>
+    </template>
+    <template id="response-item">
+        <div class="response-item"></div>
+    </template>
+    
+    <!-- Status message templates -->
+    <template id="status-saving">Speichert...</template>
+    <template id="status-saved">Gespeichert ✓</template>
+    <template id="status-save">Speichern</template>
+    <template id="error-save-failed">Antworten konnten nicht gespeichert werden. Bitte versuch' es erneut.</template>
+    <template id="error-no-invitation-id">Fehler: Keine Einladungs ID gefunden</template>
+    <template id="error-save-generic">Speichern fehlgeschlagen</template>
+</head>
+
+<body>
+    <!-- <header></header> -->
+    <main>
+        <section id="invitation">
+            <h1>Ein Fehler ist aufgetreten. Deine Einladung ist wahrscheinlich ungültig.</h1>
+        </section>
+        <section id="form-actions">
+            <button id="form-save">Speichern</button>
+        </section>
+    </main>
+    <footer>
+        <p>Party Hub &middot; &copy; Maxwell Matthis 2025</p>
+    </footer>
+</body>
+
+</html>

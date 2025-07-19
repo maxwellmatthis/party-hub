@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Party Hub</title>
+    <script src="main.js" defer></script>
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Templates -->
+    <template id="error">
+        <p>An error occurred.</p>
+    </template>
+    <template id="multiple-choice">
+        <label></label>
+        <ul></ul>
+    </template>
+    <template id="multiple-choice-item">
+        <li>
+            <input type="checkbox">
+            <span></span>
+        </li>
+    </template>
+    <template id="single-choice">
+        <label></label>
+        <ul></ul>
+    </template>
+    <template id="single-choice-item">
+        <li>
+            <input type="radio">
+            <span></span>
+        </li>
+    </template>
+    <template id="text-input">
+        <label></label>
+        <input type="text">
+    </template>
+    <template id="number-input">
+        <label></label>
+        <input type="number">
+    </template>
+    <template id="public-stats">
+        <div class="public-stats">
+            <h4>Other responses:</h4>
+            <div class="other-responses">
+                <!-- Response items will be added here -->
+            </div>
+        </div>
+    </template>
+    <template id="response-item">
+        <div class="response-item"></div>
+    </template>
+    
+    <!-- Status message templates -->
+    <template id="status-saving">Saving...</template>
+    <template id="status-saved">Saved ✓</template>
+    <template id="status-save">Save</template>
+    <template id="error-save-failed">Failed to save answers. Please try again.</template>
+    <template id="error-no-invitation-id">Error: No invitation ID found</template>
+    <template id="error-save-generic">Save failed</template>
+</head>
+
+<body>
+    <!-- <header></header> -->
+    <main>
+        <section id="invitation">
+            <h1>An error occurred. Your invitation is likely invalid.</h1>
+        </section>
+        <section id="form-actions">
+            <button id="form-save">Save</button>
+        </section>
+    </main>
+    <footer>
+        <p>Party Hub &middot; &copy; Maxwell Matthis 2025</p>
+    </footer>
+</body>
+
+</html>
