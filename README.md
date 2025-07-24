@@ -55,6 +55,26 @@ A modern, minimalistic party invitation platform built with Rust (Actix Web), SQ
 
    Save the generated secret to log into the management interface.
 
+### Environment Variables
+
+Party Hub supports the following environment variables for configuration:
+
+- **`PORT`**: Set the server port (default: 8080)
+
+  ```bash
+  export PORT=3000
+  cargo run
+  ```
+
+- **`ENV`**: Set the environment mode (default: "prod")
+  - `ENV=dev`: Enables development mode with insecure cookies for localhost testing
+  - `ENV=prod`: Production mode with secure cookies (default)
+
+  ```bash
+  export ENV=dev
+  cargo run
+  ```
+
 ## License
 
 This project is licensed under the **GNU Affero General Public License v3.0** (AGPLv3). See the LICENSE file for details.

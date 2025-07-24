@@ -7,6 +7,7 @@ use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use serde::Deserialize;
 use serde_json::json;
+use std::env;
 use std::fs;
 use time::{Duration, OffsetDateTime};
 use uuid::Uuid;
@@ -440,15 +441,16 @@ async fn auth_post(
         Ok(_author) => {
             // Create a secure, long-lived cookie with the author secret
             let expiry = OffsetDateTime::now_utc() + Duration::days(90); // 3 months
+            
+            // Only use secure=false in development environment
+            let is_dev = env::var("ENV").unwrap_or_else(|_| "prod".to_string()) == "dev";
 
             let cookie = Cookie::build("auth_token", &form.author_secret)
                 .path("/")
                 .expires(expiry)
                 .same_site(SameSite::Lax)
                 .http_only(true)
-                // For production, set secure to true for HTTPS
-                // For localhost development, keep it false
-                .secure(false) // Change to true for production HTTPS
+                .secure(!is_dev) // Secure in production, not secure in dev
                 .finish();
 
             HttpResponse::Found()
@@ -1236,6 +1238,14 @@ async fn main() -> std::io::Result<()> {
     let manager = SqliteConnectionManager::file("party.db");
     let pool = r2d2::Pool::new(manager).unwrap();
 
+    // Get port from environment variable, default to 8080
+    let port = env::var("PORT")
+        .unwrap_or_else(|_| "8080".to_string())
+        .parse::<u16>()
+        .unwrap_or(8080);
+
+    println!("Starting Party Hub server on http://127.0.0.1:{}", port);
+
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(pool.clone()))
@@ -1261,7 +1271,7 @@ async fn main() -> std::io::Result<()> {
             .service(manage)
             .service(invitation_page)
     })
-    .bind(("127.0.0.1", 8080))?
+    .bind(("127.0.0.1", port))?
     .run()
     .await
 }
