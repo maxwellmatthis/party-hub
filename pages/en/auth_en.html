@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Party Hub Authentication</title>
+    <link rel="stylesheet" href="/static/auth.css">
+</head>
+<body>
+    <div>
+        <div id="error-message" class="error" style="display: none;">
+            Invalid author secret. Please try again.
+        </div>
+        <form action="/auth" method="post">
+            <label for="author-secret">Please enter your author secret below:</label>
+            <input type="password" name="author-secret" id="author-secret" required>
+            <button type="submit">Authenticate</button>
+        </form>
+    </div>
+    
+    <script>
+        // Show error message if error parameter is present
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('error') === 'invalid') {
+            document.getElementById('error-message').style.display = 'block';
+        }
+        
+        // Focus the password input
+        document.getElementById('author-secret').focus();
+    </script>
+</body>
+</html>

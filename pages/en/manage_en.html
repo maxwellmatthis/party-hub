@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Party Hub</title>
+    <script src="/static/manage.js" defer></script>
+    <link rel="stylesheet" href="/static/manage.css">
+
+    <!-- Templates -->
+    <template id="error">
+        <p>An error occurred.</p>
+    </template>
+    <template id="party-li">
+        <button id="party-name"></button>
+    </template>
+    <template id="edit-party">
+        <section>
+            <h3>About</h3>
+            <div>
+                <label for="party-name-input">Name</label>
+                <input type="text" id="party-name-input">
+            </div>
+        </section>
+        <section>
+            <div class="section-header">
+                <h3>Invitation</h3>
+                <button id="add-block-btn" class="add-btn" type="button">
+                    <img src="/static/plus.svg" alt="Add Block">
+                    <span>Add Block</span>
+                </button>
+            </div>
+            <div id="invitation-blocks">
+                <!-- template#invitation-block with insertion points -->
+            </div>
+            <span><b>Tip:</b> Use {{name}} in headers and text to place the invitee's name.</span>
+        </section>
+        <section class="action-buttons">
+            <button id="save-party-btn">Save</button>
+            <button id="delete-party-btn">Delete</button> <!-- Red save button -->
+        </section>
+        <section>
+            <div class="section-header">
+                <h3>Guests</h3>
+                <button id="add-guest-btn" class="add-btn">
+                    <img src="/static/plus.svg" alt="Add Guest">
+                </button>
+            </div>
+            <div id="guests">
+                <!-- template#guest -->
+            </div>
+        </section>
+    </template>
+    <template id="guest">
+        <div class="guest-item">
+            <div class="guest-name">
+                <span id="guest-name"></span>
+            </div>
+            <div class="guest-actions">
+                <button id="guest-remove">
+                    <img src="/static/trash-2.svg" alt="Remove">
+                </button>
+                <button id="guest-organizer">
+                    <img src="/static/chevrons-up.svg" alt="Promote to Organizer" id="guest-promote">
+                    <img src="/static/chevrons-down.svg" alt="Demote Organizer" id="guest-demote">
+                </button>
+                <button id="guest-copy-invitation">
+                    <img src="/static/clipboard.svg" alt="Copy Invitation Link">
+                </button>
+            </div>
+        </div>
+    </template>
+    <template id="invitation-block">
+        <div class="invitation-block" data-block-id="">
+            <div class="block-controls">
+                <div class="block-drag-handle">
+                    <img src="/static/menu.svg" alt="Drag to reorder">
+                </div>
+                <button class="block-delete" type="button">
+                    <img src="/static/trash-2.svg" alt="Delete block">
+                </button>
+            </div>
+            <div class="block-content">
+                <select name="type" id="type" class="block-type-select">
+                    <option value="h1">Heading 1</option>
+                    <option value="h2">Heading 2</option>
+                    <option value="h3">Heading 3</option>
+                    <option value="p">Paragraph</option>
+                    <option value="code">Code</option>
+                    <option value="single_choice">Single Choice Question</option>
+                    <option value="multiple_choice">Multiple Choice Question</option>
+                    <option value="text_input">Text Question</option>
+                    <option value="number_input">Number Question</option>
+                </select>
+                <textarea name="text" id="content-or-label" placeholder="Enter content or question..."></textarea>
+                <input type="text" id="options" placeholder="Option 1; Option 2; Option 3..." style="display: none;">
+                <select name="visibility" id="visibility" style="display: none;">
+                    <option value="public">Public</option>
+                    <option value="private">Private</option>
+                </select>
+            </div>
+        </div>
+    </template>
+    <template id="block-insertion-point">
+        <div class="block-insertion-point">
+            <div class="insertion-line">
+                <button class="add-block-here" type="button">
+                    <img src="/static/plus.svg" alt="Add block here">
+                </button>
+            </div>
+        </div>
+    </template>
+    <template id="guest-li">
+        <button id="guest-sidebar-name"></button>
+    </template>
+    <template id="edit-guest">
+        <section>
+            <h3>Guest Details</h3>
+            <div>
+                <label for="guest-edit-name">Name</label>
+                <input id="guest-edit-name" type="text">
+            </div>
+        </section>
+        <section class="action-buttons">
+            <button id="save-guest-btn">Save</button>
+            <button id="delete-guest-btn">Delete</button>
+        </section>
+    </template>
+    <template id="add-guest-modal">
+        <div class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Add Guest to Party</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="search-container">
+                        <input type="text" id="guest-search" placeholder="Search guests...">
+                    </div>
+                    <div class="guest-list" id="modal-guest-list">
+                        <!-- Guest items will be populated here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-cancel">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </template>
+    <template id="modal-guest-item">
+        <div class="modal-guest-item" data-guest-id="">
+            <span class="guest-name"></span>
+            <button class="btn-add-guest">Add</button>
+        </div>
+    </template>
+    <template id="toast">
+        <div class="toast">
+            <span class="toast-message"></span>
+            <button class="toast-close">
+                <img src="/static/x.svg" alt="Close">
+            </button>
+        </div>
+    </template>
+    <template id="empty-state">
+        <div style="text-align: center; padding: 50px; color: #666;">
+            <h3>Select a party or guest to edit</h3>
+        </div>
+    </template>
+</head>
+
+<body>
+    <!-- Toast notifications container -->
+    <div id="toast-container"></div>
+    
+    <header>
+        <h2>Party Hub Management Dashboard</h2>
+    </header>
+    <aside>
+        <section>
+            <div>
+                <div>
+                    <img src="/static/chevron-up.svg" alt="Collapse" id="parties-collapse">
+                    <img src="/static/chevron-down.svg" alt="Expand" id="parties-expand">
+                </div>
+                <h3>Your Parties</h3>
+                <div>
+                    <img src="/static/plus.svg" alt="Add" id="add-party-btn">
+                </div>
+            </div>
+            <div id="parties">
+                <!-- template#party-li -->
+            </div>
+        </section>
+        <!-- Guest groups coming soon. -->
+        <section>
+            <div>
+                <div>
+                    <img src="/static/chevron-up.svg" alt="Collapse" id="guests-collapse">
+                    <img src="/static/chevron-down.svg" alt="Expand" id="guests-expand">
+                </div>
+                <h3>Your Guests</h3>
+                <div>
+                    <img src="/static/plus.svg" alt="Add" id="add-new-guest-btn">
+                </div>
+            </div>
+            <div id="guests">
+                <!-- template#guest-li -->
+            </div>
+        </section>
+    </aside>
+    <main>
+        <!-- Either template#edit-party or template#edit-guest -->
+    </main>
+    <footer>
+        <p>Party Hub &middot; &copy; Maxwell Matthis 2025 &middot; <a
+                href="https://github.com/maxwellmatthis/party-hub">GitHub & Licenses</a></p>
+    </footer>
+</body>
+
+</html>

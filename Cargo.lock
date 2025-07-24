@@ -900,6 +900,8 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "time",
+ "uuid",
 ]
 
 [[package]]

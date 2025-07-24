@@ -8,19 +8,19 @@ class InvitationModel {
         this.invitationData = null;
     }
 
-    setAnswer(blockIndex, value) {
-        this.answers.set(blockIndex, value);
-        this.notifyListeners('answerChanged', { blockIndex, value });
+    setAnswer(blockId, value) {
+        this.answers.set(blockId, value);
+        this.notifyListeners('answerChanged', { blockId, value });
     }
 
-    getAnswer(blockIndex) {
-        return this.answers.get(blockIndex);
+    getAnswer(blockId) {
+        return this.answers.get(blockId);
     }
 
     getAllAnswers() {
         const result = {};
-        for (const [blockIndex, answer] of this.answers) {
-            result[blockIndex] = answer;
+        for (const [blockId, answer] of this.answers) {
+            result[blockId] = answer;
         }
         return result;
     }
@@ -82,19 +82,20 @@ class InvitationView {
         return content;
     }
 
-    render(invitation_blocks, invitation_block_answers, other_guests_answers, guestName, onInputChange) {
+    render(invitation_blocks, invitation_block_answers, other_guests_answers, guestName, isOrganizer, onInputChange) {
         if (invitation_blocks.length < 1) return;
         this.invitation_section.innerHTML = "";
         invitation_blocks.forEach((block, i) => {
-            const answer = invitation_block_answers.hasOwnProperty(i.toString()) ? invitation_block_answers[i.toString()] : null;
+            const blockId = block.id || i.toString(); // Use block ID if available, fallback to index
+            const answer = invitation_block_answers.hasOwnProperty(blockId) ? invitation_block_answers[blockId] : null;
             const div = document.createElement("div");
             div.classList.add("block");
-            div.appendChild(this.createBlock(block.template, block.content, answer, i, other_guests_answers, guestName, onInputChange));
+            div.appendChild(this.createBlock(block.template, block.content, answer, blockId, other_guests_answers, guestName, isOrganizer, onInputChange));
             this.invitation_section.appendChild(div);
         });
     }
 
-    createBlock(template, content, answer_data, blockIndex, other_guests_answers, guestName, onInputChange) {
+    createBlock(template, content, answer_data, blockId, other_guests_answers, guestName, isOrganizer, onInputChange) {
         if (['h1', 'h2', 'h3', 'p', 'code'].includes(template)) {
             const el = document.createElement(template);
             el.textContent = this.personalizeContent(content, guestName);
@@ -102,20 +103,20 @@ class InvitationView {
         } else {
             switch (template) {
                 case 'multiple_choice':
-                    return this.createMultipleChoice(content, answer_data, blockIndex, other_guests_answers, guestName, onInputChange);
+                    return this.createMultipleChoice(content, answer_data, blockId, other_guests_answers, guestName, isOrganizer, onInputChange);
                 case 'single_choice':
-                    return this.createSingleChoice(content, answer_data, blockIndex, other_guests_answers, guestName, onInputChange);
+                    return this.createSingleChoice(content, answer_data, blockId, other_guests_answers, guestName, isOrganizer, onInputChange);
                 case 'text_input':
-                    return this.createTextInput(content, answer_data, blockIndex, other_guests_answers, guestName, onInputChange);
+                    return this.createTextInput(content, answer_data, blockId, other_guests_answers, guestName, isOrganizer, onInputChange);
                 case 'number_input':
-                    return this.createNumberInput(content, answer_data, blockIndex, other_guests_answers, guestName, onInputChange);
+                    return this.createNumberInput(content, answer_data, blockId, other_guests_answers, guestName, isOrganizer, onInputChange);
                 default:
                     return this.templates.error.content.cloneNode(true);
             }
         }
     }
 
-    createMultipleChoice(content, answer_data, blockIndex, other_guests_answers, guestName, onInputChange) {
+    createMultipleChoice(content, answer_data, blockId, other_guests_answers, guestName, isOrganizer, onInputChange) {
         const mc = this.templates.multiple_choice.content.cloneNode(true);
         let mcContent;
         try {
@@ -130,23 +131,31 @@ class InvitationView {
         const currentAnswer = answer_data || [];
         const isPublic = mcContent.public === true;
 
-        // Calculate stats if this block is public
+        // Calculate stats if this block is public or user is organizer
         let optionCounts = [];
-        if (isPublic && other_guests_answers) {
+        let optionGuestNames = []; // Track which guests selected each option
+        if ((isPublic || isOrganizer) && other_guests_answers) {
             optionCounts = new Array(mcContent.options.length).fill(0);
-            
+            optionGuestNames = new Array(mcContent.options.length).fill().map(() => []);
+
             // Include other guests' answers
             other_guests_answers.forEach(guestAnswers => {
-                const blockAnswer = guestAnswers[blockIndex.toString()];
-                if (Array.isArray(blockAnswer)) {
-                    blockAnswer.forEach((selected, optionIndex) => {
-                        if (selected && optionIndex < optionCounts.length) {
-                            optionCounts[optionIndex]++;
-                        }
-                    });
+                const blockAnswerData = guestAnswers[blockId];
+                if (blockAnswerData) {
+                    const blockAnswer = blockAnswerData.answer;
+                    const guestName = blockAnswerData.guest_name;
+                    
+                    if (Array.isArray(blockAnswer)) {
+                        blockAnswer.forEach((selected, optionIndex) => {
+                            if (selected && optionIndex < optionCounts.length) {
+                                optionCounts[optionIndex]++;
+                                optionGuestNames[optionIndex].push(guestName);
+                            }
+                        });
+                    }
                 }
             });
-            
+
             // Include current user's answer
             if (Array.isArray(currentAnswer)) {
                 currentAnswer.forEach((selected, optionIndex) => {
@@ -163,9 +172,15 @@ class InvitationView {
             const checkbox = li.querySelector('input');
             const span = li.querySelector('span');
 
-            // Set option text with public stats if available
-            if (isPublic && optionCounts.length > 0) {
-                span.textContent = `${o} (${optionCounts[i] || 0})`;
+            // Set option text with public stats and guest names if available
+            if ((isPublic || isOrganizer) && optionCounts.length > 0) {
+                const count = optionCounts[i] || 0;
+                const names = optionGuestNames[i] || [];
+                if (names.length > 0) {
+                    span.textContent = `${o} (${count}) - ${names.join(', ')}`;
+                } else {
+                    span.textContent = `${o} (${count})`;
+                }
             } else {
                 span.textContent = o;
             }
@@ -176,29 +191,36 @@ class InvitationView {
                 // Get all checkboxes for this multiple choice question
                 const allCheckboxes = ul.querySelectorAll('input[type="checkbox"]');
                 const newAnswers = Array.from(allCheckboxes).map(cb => cb.checked);
-                onInputChange(blockIndex, newAnswers);
-                
+                onInputChange(blockId, newAnswers);
+
                 // Update stats in real-time
                 updateStatsDisplay();
             };
 
             const updateStatsDisplay = () => {
-                if (isPublic && optionCounts.length > 0) {
+                if ((isPublic || isOrganizer) && optionCounts.length > 0) {
                     // Recalculate counts including current selections
                     const updatedCounts = new Array(mcContent.options.length).fill(0);
-                    
+                    const updatedGuestNames = new Array(mcContent.options.length).fill().map(() => []);
+
                     // Include other guests' answers
                     other_guests_answers.forEach(guestAnswers => {
-                        const blockAnswer = guestAnswers[blockIndex.toString()];
-                        if (Array.isArray(blockAnswer)) {
-                            blockAnswer.forEach((selected, optionIndex) => {
-                                if (selected && optionIndex < updatedCounts.length) {
-                                    updatedCounts[optionIndex]++;
-                                }
-                            });
+                        const blockAnswerData = guestAnswers[blockId];
+                        if (blockAnswerData) {
+                            const blockAnswer = blockAnswerData.answer;
+                            const guestName = blockAnswerData.guest_name;
+                            
+                            if (Array.isArray(blockAnswer)) {
+                                blockAnswer.forEach((selected, optionIndex) => {
+                                    if (selected && optionIndex < updatedCounts.length) {
+                                        updatedCounts[optionIndex]++;
+                                        updatedGuestNames[optionIndex].push(guestName);
+                                    }
+                                });
+                            }
                         }
                     });
-                    
+
                     // Include current user's selections
                     const currentSelections = Array.from(ul.querySelectorAll('input[type="checkbox"]')).map(cb => cb.checked);
                     currentSelections.forEach((selected, optionIndex) => {
@@ -206,12 +228,18 @@ class InvitationView {
                             updatedCounts[optionIndex]++;
                         }
                     });
-                    
-                    // Update all span texts with new counts
+
+                    // Update all span texts with new counts and guest names
                     mcContent.options.forEach((o, i) => {
                         const currentSpan = ul.querySelectorAll('span')[i];
                         if (currentSpan) {
-                            currentSpan.textContent = `${o} (${updatedCounts[i] || 0})`;
+                            const count = updatedCounts[i] || 0;
+                            const names = updatedGuestNames[i] || [];
+                            if (names.length > 0) {
+                                currentSpan.textContent = `${o} (${count}) - ${names.join(', ')}`;
+                            } else {
+                                currentSpan.textContent = `${o} (${count})`;
+                            }
                         }
                     });
                 }
@@ -231,7 +259,7 @@ class InvitationView {
         return mc;
     }
 
-    createSingleChoice(content, answer_data, blockIndex, other_guests_answers, guestName, onInputChange) {
+    createSingleChoice(content, answer_data, blockId, other_guests_answers, guestName, isOrganizer, onInputChange) {
         const sc = this.templates.single_choice.content.cloneNode(true);
         let scContent;
         try {
@@ -245,21 +273,29 @@ class InvitationView {
 
         const currentAnswer = answer_data !== undefined && answer_data !== null ? answer_data : -1; // Single choice uses index, -1 means no selection
         const isPublic = scContent.public === true;
-        const radioGroupName = `single_choice_${blockIndex}`;
+        const radioGroupName = `single_choice_${blockId}`;
 
-        // Calculate stats if this block is public
+        // Calculate stats if this block is public or user is organizer
         let optionCounts = [];
-        if (isPublic && other_guests_answers) {
+        let optionGuestNames = []; // Track which guests selected each option
+        if ((isPublic || isOrganizer) && other_guests_answers) {
             optionCounts = new Array(scContent.options.length).fill(0);
-            
+            optionGuestNames = new Array(scContent.options.length).fill().map(() => []);
+
             // Include other guests' answers
             other_guests_answers.forEach(guestAnswers => {
-                const blockAnswer = guestAnswers[blockIndex.toString()];
-                if (typeof blockAnswer === 'number' && blockAnswer >= 0 && blockAnswer < optionCounts.length) {
-                    optionCounts[blockAnswer]++;
+                const blockAnswerData = guestAnswers[blockId];
+                if (blockAnswerData) {
+                    const blockAnswer = blockAnswerData.answer;
+                    const guestName = blockAnswerData.guest_name;
+                    
+                    if (typeof blockAnswer === 'number' && blockAnswer >= 0 && blockAnswer < optionCounts.length) {
+                        optionCounts[blockAnswer]++;
+                        optionGuestNames[blockAnswer].push(guestName);
+                    }
                 }
             });
-            
+
             // Include current user's answer
             if (typeof currentAnswer === 'number' && currentAnswer >= 0 && currentAnswer < optionCounts.length) {
                 optionCounts[currentAnswer]++;
@@ -276,9 +312,15 @@ class InvitationView {
             radio.name = radioGroupName;
             radio.value = i;
 
-            // Set option text with public stats if available
-            if (isPublic && optionCounts.length > 0) {
-                span.textContent = `${o} (${optionCounts[i] || 0})`;
+            // Set option text with public stats and guest names if available
+            if ((isPublic || isOrganizer) && optionCounts.length > 0) {
+                const count = optionCounts[i] || 0;
+                const names = optionGuestNames[i] || [];
+                if (names.length > 0) {
+                    span.textContent = `${o} (${count}) - ${names.join(', ')}`;
+                } else {
+                    span.textContent = `${o} (${count})`;
+                }
             } else {
                 span.textContent = o;
             }
@@ -288,25 +330,32 @@ class InvitationView {
             const updateAnswer = () => {
                 const selectedRadio = ul.querySelector('input[type="radio"]:checked');
                 const selectedIndex = selectedRadio ? parseInt(selectedRadio.value) : -1;
-                onInputChange(blockIndex, selectedIndex);
-                
+                onInputChange(blockId, selectedIndex);
+
                 // Update stats in real-time
                 updateStatsDisplay();
             };
 
             const updateStatsDisplay = () => {
-                if (isPublic && optionCounts.length > 0) {
+                if ((isPublic || isOrganizer) && optionCounts.length > 0) {
                     // Recalculate counts including current selection
                     const updatedCounts = new Array(scContent.options.length).fill(0);
-                    
+                    const updatedGuestNames = new Array(scContent.options.length).fill().map(() => []);
+
                     // Include other guests' answers
                     other_guests_answers.forEach(guestAnswers => {
-                        const blockAnswer = guestAnswers[blockIndex.toString()];
-                        if (typeof blockAnswer === 'number' && blockAnswer >= 0 && blockAnswer < updatedCounts.length) {
-                            updatedCounts[blockAnswer]++;
+                        const blockAnswerData = guestAnswers[blockId];
+                        if (blockAnswerData) {
+                            const blockAnswer = blockAnswerData.answer;
+                            const guestName = blockAnswerData.guest_name;
+                            
+                            if (typeof blockAnswer === 'number' && blockAnswer >= 0 && blockAnswer < updatedCounts.length) {
+                                updatedCounts[blockAnswer]++;
+                                updatedGuestNames[blockAnswer].push(guestName);
+                            }
                         }
                     });
-                    
+
                     // Include current user's selection
                     const selectedRadio = ul.querySelector('input[type="radio"]:checked');
                     if (selectedRadio) {
@@ -315,12 +364,18 @@ class InvitationView {
                             updatedCounts[selectedIndex]++;
                         }
                     }
-                    
-                    // Update all span texts with new counts
+
+                    // Update all span texts with new counts and guest names
                     scContent.options.forEach((o, i) => {
                         const currentSpan = ul.querySelectorAll('span')[i];
                         if (currentSpan) {
-                            currentSpan.textContent = `${o} (${updatedCounts[i] || 0})`;
+                            const count = updatedCounts[i] || 0;
+                            const names = updatedGuestNames[i] || [];
+                            if (names.length > 0) {
+                                currentSpan.textContent = `${o} (${count}) - ${names.join(', ')}`;
+                            } else {
+                                currentSpan.textContent = `${o} (${count})`;
+                            }
                         }
                     });
                 }
@@ -340,7 +395,7 @@ class InvitationView {
         return sc;
     }
 
-    createTextInput(content, answer_data, blockIndex, other_guests_answers, guestName, onInputChange) {
+    createTextInput(content, answer_data, blockId, other_guests_answers, guestName, isOrganizer, onInputChange) {
         const ti = this.templates.text_input.content.cloneNode(true);
         const textInput = ti.querySelector("input");
 
@@ -363,29 +418,34 @@ class InvitationView {
         textInput.value = answer_data || '';
 
         textInput.addEventListener('input', () => {
-            onInputChange(blockIndex, textInput.value);
+            onInputChange(blockId, textInput.value);
         });
 
-        // Add public stats if enabled
-        if (isPublic && other_guests_answers) {
+        // Add public stats if enabled or user is organizer
+        if ((isPublic || isOrganizer) && other_guests_answers) {
             const otherAnswers = [];
             other_guests_answers.forEach(guestAnswers => {
-                const blockAnswer = guestAnswers[blockIndex.toString()];
-                if (blockAnswer && typeof blockAnswer === 'string' && blockAnswer.trim() !== '') {
-                    otherAnswers.push(blockAnswer);
+                const blockAnswerData = guestAnswers[blockId];
+                if (blockAnswerData) {
+                    const blockAnswer = blockAnswerData.answer;
+                    const guestName = blockAnswerData.guest_name;
+                    
+                    if (blockAnswer && typeof blockAnswer === 'string' && blockAnswer.trim() !== '') {
+                        otherAnswers.push({ answer: blockAnswer, guest_name: guestName });
+                    }
                 }
             });
 
             if (otherAnswers.length > 0) {
                 const statsDiv = this.templates.public_stats.content.cloneNode(true);
                 const responsesContainer = statsDiv.querySelector('.other-responses');
-                
-                otherAnswers.forEach(answer => {
+
+                otherAnswers.forEach(({ answer, guest_name }) => {
                     const responseItem = this.templates.response_item.content.cloneNode(true);
-                    responseItem.querySelector('.response-item').textContent = answer;
+                    responseItem.querySelector('.response-item').textContent = `${answer} - ${guest_name}`;
                     responsesContainer.appendChild(responseItem);
                 });
-                
+
                 ti.appendChild(statsDiv);
             }
         }
@@ -393,7 +453,7 @@ class InvitationView {
         return ti;
     }
 
-    createNumberInput(content, answer_data, blockIndex, other_guests_answers, guestName, onInputChange) {
+    createNumberInput(content, answer_data, blockId, other_guests_answers, guestName, isOrganizer, onInputChange) {
         const ni = this.templates.number_input.content.cloneNode(true);
         const numberInput = ni.querySelector("input");
 
@@ -416,29 +476,34 @@ class InvitationView {
         numberInput.value = answer_data || '';
 
         numberInput.addEventListener('input', () => {
-            onInputChange(blockIndex, numberInput.value);
+            onInputChange(blockId, numberInput.value);
         });
 
-        // Add public stats if enabled
-        if (isPublic && other_guests_answers) {
+        // Add public stats if enabled or user is organizer
+        if ((isPublic || isOrganizer) && other_guests_answers) {
             const otherAnswers = [];
             other_guests_answers.forEach(guestAnswers => {
-                const blockAnswer = guestAnswers[blockIndex.toString()];
-                if (blockAnswer && typeof blockAnswer === 'string' && blockAnswer.trim() !== '') {
-                    otherAnswers.push(blockAnswer);
+                const blockAnswerData = guestAnswers[blockId];
+                if (blockAnswerData) {
+                    const blockAnswer = blockAnswerData.answer;
+                    const guestName = blockAnswerData.guest_name;
+                    
+                    if (blockAnswer && typeof blockAnswer === 'string' && blockAnswer.trim() !== '') {
+                        otherAnswers.push({ answer: blockAnswer, guest_name: guestName });
+                    }
                 }
             });
 
             if (otherAnswers.length > 0) {
                 const statsDiv = this.templates.public_stats.content.cloneNode(true);
                 const responsesContainer = statsDiv.querySelector('.other-responses');
-                
-                otherAnswers.forEach(answer => {
+
+                otherAnswers.forEach(({ answer, guest_name }) => {
                     const responseItem = this.templates.response_item.content.cloneNode(true);
-                    responseItem.querySelector('.response-item').textContent = answer;
+                    responseItem.querySelector('.response-item').textContent = `${answer} - ${guest_name}`;
                     responsesContainer.appendChild(responseItem);
                 });
-                
+
                 ni.appendChild(statsDiv);
             }
         }
@@ -503,8 +568,8 @@ class InvitationController {
 
             // Initialize model with existing answers
             if (data.invitation_block_answers) {
-                Object.entries(data.invitation_block_answers).forEach(([blockIndex, answer]) => {
-                    this.model.setAnswer(parseInt(blockIndex), answer);
+                Object.entries(data.invitation_block_answers).forEach(([blockId, answer]) => {
+                    this.model.setAnswer(blockId, answer);
                 });
             }
         } catch (error) {
@@ -521,7 +586,8 @@ class InvitationController {
             data.invitation_block_answers || {},
             data.other_guests_answers || [],
             data.guest_name, // Pass guest name to view
-            (blockIndex, value) => this.model.setAnswer(blockIndex, value)
+            data.is_organizer || false, // Pass organizer status to view
+            (blockId, value) => this.model.setAnswer(blockId, value)
         );
     }
 

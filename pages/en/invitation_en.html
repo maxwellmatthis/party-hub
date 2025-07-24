@@ -1,16 +1,16 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Party Hub</title>
-    <script src="main.js" defer></script>
-    <link rel="stylesheet" href="style.css">
+    <script src="/static/invitation.js" defer></script>
+    <link rel="stylesheet" href="/static/invitation.css">
 
     <!-- Templates -->
     <template id="error">
-        <p>Ein Fehler ist aufgetreten.</p>
+        <p>An error occurred.</p>
     </template>
     <template id="multiple-choice">
         <label></label>
@@ -42,7 +42,7 @@
     </template>
     <template id="public-stats">
         <div class="public-stats">
-            <h4>Andere Rückmeldungen:</h4>
+            <h4>Other responses:</h4>
             <div class="other-responses">
                 <!-- Response items will be added here -->
             </div>
@@ -53,28 +53,28 @@
     </template>
     
     <!-- Status message templates -->
-    <template id="status-saving">Speichert...</template>
-    <template id="status-saved">Gespeichert ✓</template>
-    <template id="status-save">Speichern</template>
-    <template id="error-save-failed">Antworten konnten nicht gespeichert werden. Bitte versuch' es erneut.</template>
-    <template id="error-no-invitation-id">Fehler: Keine Einladungs ID gefunden</template>
-    <template id="error-save-generic">Speichern fehlgeschlagen</template>
+    <template id="status-saving">Saving...</template>
+    <template id="status-saved">Saved ✓</template>
+    <template id="status-save">Save</template>
+    <template id="error-save-failed">Failed to save answers. Please try again.</template>
+    <template id="error-no-invitation-id">Error: No invitation ID found</template>
+    <template id="error-save-generic">Save failed</template>
 </head>
 
 <body>
     <header>
-        <b>Hinweis:</b> Du kannst deine Antwort beliebig häufig speichern. Du musst auch nicht gleich alle Felder ausfüllen.
+        <b>Note:</b> You can change your answers as often as you like. You don't immediately need to fill out every section yet either.
     </header>
     <main>
         <section id="invitation">
-            <h1>Ein Fehler ist aufgetreten. Deine Einladung ist wahrscheinlich ungültig.</h1>
+            <h1>An error occurred. Your invitation is likely invalid.</h1>
         </section>
         <section id="form-actions">
-            <button id="form-save">Speichern</button>
+            <button id="form-save">Save</button>
         </section>
     </main>
     <footer>
-        <p>Party Hub &middot; &copy; Maxwell Matthis 2025 &middot; <a href="https://github.com/maxwellmatthis/party-hub">GitHub & Lizenzen</a></p>
+        <p>Party Hub &middot; &copy; Maxwell Matthis 2025 &middot; <a href="https://github.com/maxwellmatthis/party-hub">GitHub & Licenses</a></p>
     </footer>
 </body>
 

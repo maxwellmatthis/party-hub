@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Party Hub Authentifizierung</title>
+    <link rel="stylesheet" href="/static/auth.css">
+</head>
+
+<body>
+    <div>
+        <div id="error-message" class="error" style="display: none;">
+            Ungültiges Autor-Secret. Bitte versuch es nochmal.
+        </div>
+        <form action="/auth" method="post">
+            <label for="author-secret">Bitte gib dein Autor-Secret unten ein:</label>
+            <input type="password" name="author-secret" id="author-secret" required>
+            <button type="submit">Authentifizieren</button>
+        </form>
+    </div>
+
+    <script>
+        // Show error message if error parameter is present
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('error') === 'invalid') {
+            document.getElementById('error-message').style.display = 'block';
+        }
+
+        // Focus the password input
+        document.getElementById('author-secret').focus();
+    </script>
+</body>
+
+</html>
