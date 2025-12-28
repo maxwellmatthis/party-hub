@@ -304,7 +304,7 @@ async function renderParty(partyId) {
             const guestElement = templateGuest.content.cloneNode(true);
             const guestDiv = guestElement.querySelector(".guest-item");
 
-            guestElement.querySelector("span#guest-name").textContent = guest.name;
+            guestElement.querySelector("span#guest-name").textContent = `${guest.first} ${guest.last}`.trim() || 'Unnamed Guest';
 
             const organizerButton = guestElement.querySelector("button#guest-organizer");
             const chevronUp = organizerButton.querySelector('#guest-promote');
@@ -511,9 +511,9 @@ function populateGuestList(filteredGuests = null) {
         const addBtn = guestItem.querySelector(".btn-add-guest");
 
         guestDiv.setAttribute('data-guest-id', guest.id);
-        guestName.textContent = guest.name;
+        guestName.textContent = `${guest.first} ${guest.last}`.trim() || 'Unnamed Guest';
 
-        addBtn.addEventListener('click', () => addGuestToParty(guest.id, guest.name));
+        addBtn.addEventListener('click', () => addGuestToParty(guest.id, `${guest.first} ${guest.last}`.trim()));
 
         guestList.appendChild(guestItem);
     });
@@ -529,9 +529,10 @@ function setupGuestSearch() {
         if (searchTerm === '') {
             populateGuestList();
         } else {
-            const filteredGuests = allGuests.filter(guest =>
-                guest.name.toLowerCase().includes(searchTerm)
-            );
+            const filteredGuests = allGuests.filter(guest => {
+                const fullName = `${guest.first} ${guest.last}`.toLowerCase();
+                return fullName.includes(searchTerm);
+            });
             populateGuestList(filteredGuests);
         }
     });
@@ -684,7 +685,9 @@ async function renderGuests() {
         myGuests.forEach(guest => {
             const gl = templateGuestLi.content.cloneNode(true);
             const nameBtn = gl.querySelector("button#guest-sidebar-name");
-            nameBtn.textContent = guest.name;
+            // Display full name (first + last)
+            const displayName = `${guest.first} ${guest.last}`.trim() || 'Unnamed Guest';
+            nameBtn.textContent = displayName;
             nameBtn.addEventListener("click", () => renderGuest(guest.id));
             guests.appendChild(gl);
         });
@@ -704,8 +707,17 @@ async function renderGuest(guestId) {
         main.innerHTML = "";
         const g = templateEditGuest.content.cloneNode(true);
 
-        const nameInput = g.querySelector("input#guest-edit-name");
-        nameInput.value = guestDetails.name;
+        const salutationInput = g.querySelector("input#guest-edit-salutation");
+        const firstInput = g.querySelector("input#guest-edit-first");
+        const lastInput = g.querySelector("input#guest-edit-last");
+        const emailInput = g.querySelector("input#guest-edit-email");
+        const noteTextarea = g.querySelector("textarea#guest-edit-note");
+        
+        salutationInput.value = guestDetails.salutation || '';
+        firstInput.value = guestDetails.first || '';
+        lastInput.value = guestDetails.last || '';
+        emailInput.value = guestDetails.email || '';
+        noteTextarea.value = guestDetails.note || '';
 
         g.querySelector("#save-guest-btn").addEventListener('click', () => saveGuest(guestId));
         g.querySelector("#delete-guest-btn").addEventListener('click', () => deleteGuest(guestId));
@@ -720,21 +732,32 @@ async function renderGuest(guestId) {
 
 async function saveGuest(guestId) {
     try {
-        const nameInput = document.querySelector("input#guest-edit-name");
-        if (!nameInput) {
-            showToast('Error: Could not find guest name input', 'error');
+        const salutationInput = document.querySelector("input#guest-edit-salutation");
+        const firstInput = document.querySelector("input#guest-edit-first");
+        const lastInput = document.querySelector("input#guest-edit-last");
+        const emailInput = document.querySelector("input#guest-edit-email");
+        const noteTextarea = document.querySelector("textarea#guest-edit-note");
+        
+        if (!firstInput || !lastInput) {
+            showToast('Error: Could not find guest input fields', 'error');
             return;
         }
 
-        const guestName = nameInput.value.trim();
-        if (!guestName) {
-            showToast('Please enter a guest name', 'warning');
-            nameInput.focus();
+        const firstName = firstInput.value.trim();
+        const lastName = lastInput.value.trim();
+        
+        if (!firstName && !lastName) {
+            showToast('Please enter at least a first or last name', 'warning');
+            firstInput.focus();
             return;
         }
 
         const updateData = {
-            name: guestName
+            salutation: salutationInput ? salutationInput.value.trim() : '',
+            first: firstName,
+            last: lastName,
+            email: emailInput ? emailInput.value.trim() : '',
+            note: noteTextarea ? noteTextarea.value.trim() : ''
         };
 
         const response = await fetch(`/guest/${guestId}/update`, {
@@ -761,8 +784,11 @@ async function saveGuest(guestId) {
 }
 
 async function deleteGuest(guestId) {
-    const nameInput = document.querySelector("input#guest-edit-name");
-    const guestName = nameInput ? nameInput.value : 'this guest';
+    const firstInput = document.querySelector("input#guest-edit-first");
+    const lastInput = document.querySelector("input#guest-edit-last");
+    const guestName = (firstInput && lastInput) 
+        ? `${firstInput.value} ${lastInput.value}`.trim() || 'this guest'
+        : 'this guest';
     const confirmed = confirm(`Are you sure you want to delete "${guestName}"? This action cannot be undone and will remove the guest from all parties.`);
 
     if (!confirmed) {

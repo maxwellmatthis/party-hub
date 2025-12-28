@@ -34,7 +34,7 @@
             <div id="invitation-blocks">
                 <!-- template#invitation-block with insertion points -->
             </div>
-            <span><b>Tip:</b> Use {{name}} in headers and text to place the invitee's name.</span>
+            <span><b>Tip:</b> Use {{salutation}}, {{first}} or {{last}} in headers and text to place the invitee's name.</span>
         </section>
         <section class="action-buttons">
             <button id="save-party-btn">Save</button>
@@ -118,8 +118,24 @@
         <section>
             <h3>Guest Details</h3>
             <div>
-                <label for="guest-edit-name">Name</label>
-                <input id="guest-edit-name" type="text">
+                <label for="guest-edit-salutation">Salutation</label>
+                <input id="guest-edit-salutation" type="text" placeholder="Mr., Ms., Dr., etc.">
+            </div>
+            <div>
+                <label for="guest-edit-first">First Name</label>
+                <input id="guest-edit-first" type="text">
+            </div>
+            <div>
+                <label for="guest-edit-last">Last Name</label>
+                <input id="guest-edit-last" type="text">
+            </div>
+            <div>
+                <label for="guest-edit-email">Email</label>
+                <input id="guest-edit-email" type="email">
+            </div>
+            <div>
+                <label for="guest-edit-note">Notes</label>
+                <textarea id="guest-edit-note" placeholder="Allergies, treatment preferences, given and received gifts, etc."></textarea>
             </div>
         </section>
         <section class="action-buttons">

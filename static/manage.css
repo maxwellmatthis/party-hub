@@ -675,6 +675,7 @@ label {
 }
 
 input[type="text"],
+input[type="email"],
 textarea,
 select {
     width: 100%;
@@ -689,6 +690,7 @@ select {
 }
 
 input[type="text"]:focus,
+input[type="email"]:focus,
 textarea:focus,
 select:focus {
     outline: none;

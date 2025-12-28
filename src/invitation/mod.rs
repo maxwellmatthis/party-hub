@@ -72,18 +72,23 @@ async fn details(
         Err(_) => return HttpResponse::BadRequest().body("Invitation not found"),
     };
 
-    // Get guest name
-    let guest_name = match conn
-        .prepare("SELECT name FROM guests WHERE id = ?1")
+    // Get guest information for personalization
+    let (guest_salutation, guest_first, guest_last) = match conn
+        .prepare("SELECT salutation, first, last FROM guests WHERE id = ?1")
         .and_then(|mut stmt| {
             stmt.query_row([&invitation.guest_id], |row| {
-                let name: String = row.get(0)?;
-                Ok(name)
+                let salutation: String = row.get(0)?;
+                let first: String = row.get(1)?;
+                let last: String = row.get(2)?;
+                Ok((salutation, first, last))
             })
         }) {
-        Ok(name) => name,
+        Ok(info) => info,
         Err(_) => return HttpResponse::InternalServerError().body("Guest not found"),
     };
+
+    // Create full name for backward compatibility
+    let guest_name = format!("{} {}", guest_first, guest_last).trim().to_string();
 
     let invitation_blocks = match conn
         .prepare("SELECT invitation_blocks FROM parties WHERE id = ?1")
@@ -99,11 +104,13 @@ async fn details(
 
     // Get all other guests' answers for the same party (excluding current invitation)
     // Include guest names for organizer view
-    let all_other_answers = match conn.prepare("SELECT i.invitation_block_answers, g.name FROM invitations i JOIN guests g ON i.guest_id = g.id WHERE i.party_id = ?1 AND i.id != ?2 AND i.invitation_block_answers != ''")
+    let all_other_answers = match conn.prepare("SELECT i.invitation_block_answers, g.first, g.last FROM invitations i JOIN guests g ON i.guest_id = g.id WHERE i.party_id = ?1 AND i.id != ?2 AND i.invitation_block_answers != ''")
         .and_then(|mut stmt| {
             let answer_iter = stmt.query_map([&invitation.party_id, &invitation_id], |row| {
                 let answers: String = row.get(0)?;
-                let guest_name: String = row.get(1)?;
+                let first: String = row.get(1)?;
+                let last: String = row.get(2)?;
+                let guest_name = format!("{} {}", first, last).trim().to_string();
                 Ok((answers, guest_name))
             })?;
 
@@ -196,6 +203,9 @@ async fn details(
         "invitation_block_answers": invitation.get_answers_json(),
         "other_guests_answers": filtered_other_answers,
         "guest_name": guest_name,
+        "guest_salutation": guest_salutation,
+        "guest_first": guest_first,
+        "guest_last": guest_last,
         "is_organizer": invitation.organizer,
     });
 

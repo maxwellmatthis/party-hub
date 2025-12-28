@@ -34,7 +34,7 @@
             <div id="invitation-blocks">
                 <!-- template#invitation-block with insertion points -->
             </div>
-            <span><b>Tipp:</b> Nutze {{name}} um in Überschriften und Texten den Namen des Gastes anzuzeigen.</span>
+            <span><b>Tipp:</b> Nutze {{salutation}}, {{first}} oder {{last}} um in Überschriften und Texten den Namen des Gastes anzuzeigen.</span>
         </section>
         <section class="action-buttons">
             <button id="save-party-btn">Speichern</button>
@@ -118,8 +118,24 @@
         <section>
             <h3>Gast-Details</h3>
             <div>
-                <label for="guest-edit-name">Name</label>
-                <input id="guest-edit-name" type="text">
+                <label for="guest-edit-salutation">Anrede</label>
+                <input id="guest-edit-salutation" type="text" placeholder="Herr, Frau, Dr., etc.">
+            </div>
+            <div>
+                <label for="guest-edit-first">Vorname</label>
+                <input id="guest-edit-first" type="text">
+            </div>
+            <div>
+                <label for="guest-edit-last">Nachname</label>
+                <input id="guest-edit-last" type="text">
+            </div>
+            <div>
+                <label for="guest-edit-email">E-Mail</label>
+                <input id="guest-edit-email" type="email">
+            </div>
+            <div>
+                <label for="guest-edit-note">Notizen</label>
+                <textarea id="guest-edit-note" placeholder="Allergien, Behandlungspräferenzen, geschenkte und erhaltene Geschenke, usw."></textarea>
             </div>
         </section>
         <section class="action-buttons">

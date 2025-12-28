@@ -17,7 +17,7 @@ async fn get_guests(
 
         // Get all guests for this author
         let guests_result = conn
-            .prepare("SELECT id, name, author FROM guests WHERE author = ?1 ORDER BY name")
+            .prepare("SELECT id, salutation, first, last, email, note, author FROM guests WHERE author = ?1 ORDER BY last, first")
             .and_then(|mut stmt| {
                 let guest_iter = stmt.query_map([&author_id], Guest::from_row)?;
 
@@ -43,7 +43,11 @@ async fn get_guests(
 
 #[derive(Deserialize)]
 struct UpdateGuestForm {
-    name: String,
+    salutation: String,
+    first: String,
+    last: String,
+    email: String,
+    note: String,
 }
 
 #[get("/{guest_id}")]
@@ -60,7 +64,7 @@ async fn get_guest_details(
 
         // Get guest details, ensuring it belongs to the authenticated author
         let guest = match conn
-            .prepare("SELECT id, name, author FROM guests WHERE id = ?1 AND author = ?2")
+            .prepare("SELECT id, salutation, first, last, email, note, author FROM guests WHERE id = ?1 AND author = ?2")
             .and_then(|mut stmt| stmt.query_row([&guest_id, &author_id], Guest::from_row))
         {
             Ok(guest) => guest,
@@ -90,10 +94,10 @@ async fn update_guest(
     if let Some(author_id) = is_authenticated_as_author(&req, &pool) {
         let conn = pool.get().unwrap();
 
-        // Update guest name, ensuring it belongs to the authenticated author
+        // Update guest fields, ensuring it belongs to the authenticated author
         let result = conn
-            .prepare("UPDATE guests SET name = ?1 WHERE id = ?2 AND author = ?3")
-            .and_then(|mut stmt| stmt.execute([&form.name, &guest_id, &author_id]));
+            .prepare("UPDATE guests SET salutation = ?1, first = ?2, last = ?3, email = ?4, note = ?5 WHERE id = ?6 AND author = ?7")
+            .and_then(|mut stmt| stmt.execute([&form.salutation, &form.first, &form.last, &form.email, &form.note, &guest_id, &author_id]));
 
         match result {
             Ok(rows_affected) => {
@@ -185,11 +189,15 @@ async fn create_guest(
         let guest_id = Uuid::new_v4().to_string();
 
         // Create empty guest with default values
-        let default_name = "New Guest";
+        let default_salutation = "";
+        let default_first = "New";
+        let default_last = "";
+        let default_email = "";
+        let default_note = "";
 
         let result = conn
-            .prepare("INSERT INTO guests (id, name, author) VALUES (?1, ?2, ?3)")
-            .and_then(|mut stmt| stmt.execute([&guest_id, default_name, &author_id]));
+            .prepare("INSERT INTO guests (id, salutation, first, last, email, note, author) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)")
+            .and_then(|mut stmt| stmt.execute([&guest_id, default_salutation, default_first, default_last, default_email, default_note, &author_id]));
 
         match result {
             Ok(_) => HttpResponse::Ok().json(json!({

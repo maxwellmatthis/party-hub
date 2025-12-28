@@ -68,7 +68,11 @@ impl Invitation {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Guest {
     pub id: String,
-    pub name: String,
+    pub salutation: String,
+    pub first: String,
+    pub last: String,
+    pub email: String,
+    pub note: String,
     pub author: String,
 }
 
@@ -76,7 +80,11 @@ impl Guest {
     pub fn from_row(row: &Row) -> rusqlite::Result<Self> {
         Ok(Guest {
             id: row.get("id")?,
-            name: row.get("name")?,
+            salutation: row.get("salutation")?,
+            first: row.get("first")?,
+            last: row.get("last")?,
+            email: row.get("email")?,
+            note: row.get("note")?,
             author: row.get("author")?,
         })
     }
@@ -85,7 +93,11 @@ impl Guest {
     pub fn to_json(&self) -> serde_json::Value {
         serde_json::json!({
             "id": self.id,
-            "name": self.name
+            "salutation": self.salutation,
+            "first": self.first,
+            "last": self.last,
+            "email": self.email,
+            "note": self.note
         })
     }
 }
@@ -134,7 +146,11 @@ pub fn prepare_db() -> Result<()> {
     conn.execute(
         "CREATE TABLE IF NOT EXISTS guests (
             id    TEXT PRIMARY KEY,
-            name  TEXT NOT NULL,
+            salutation TEXT NOT NULL DEFAULT '',
+            first TEXT NOT NULL DEFAULT '',
+            last TEXT NOT NULL DEFAULT '',
+            email TEXT NOT NULL DEFAULT '',
+            note TEXT NOT NULL DEFAULT '',
             author TEXT NOT NULL
         )",
         (),

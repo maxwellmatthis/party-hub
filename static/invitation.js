@@ -38,6 +38,16 @@ class InvitationModel {
         return this.invitationData ? this.invitationData.guest_name : '';
     }
 
+    getGuestData() {
+        if (!this.invitationData) return { name: '', salutation: '', first: '', last: '' };
+        return {
+            name: this.invitationData.guest_name || '',
+            salutation: this.invitationData.guest_salutation || '',
+            first: this.invitationData.guest_first || '',
+            last: this.invitationData.guest_last || ''
+        };
+    }
+
     addListener(callback) {
         this.listeners.add(callback);
     }
@@ -74,15 +84,21 @@ class InvitationView {
         };
     }
 
-    // Personalize content by replacing {{name}} with guest name
-    personalizeContent(content, guestName) {
+    personalizeContent(content, guestData) {
         if (typeof content === 'string') {
-            return content.replace(/\{\{name\}\}/g, guestName || '');
+            let personalized = content;
+            if (guestData) {
+                personalized = personalized.replace(/\{\{salutation\}\}/g, guestData.salutation || '');
+                personalized = personalized.replace(/\{\{first\}\}/g, guestData.first || '');
+                personalized = personalized.replace(/\{\{last\}\}/g, guestData.last || '');
+                personalized = personalized.replace(/\{\{name\}\}/g, guestData.name || '');
+            }
+            return personalized;
         }
         return content;
     }
 
-    render(invitation_blocks, invitation_block_answers, other_guests_answers, guestName, isOrganizer, onInputChange) {
+    render(invitation_blocks, invitation_block_answers, other_guests_answers, guestData, isOrganizer, onInputChange) {
         if (invitation_blocks.length < 1) return;
         this.invitation_section.innerHTML = "";
         invitation_blocks.forEach((block, i) => {
@@ -90,33 +106,33 @@ class InvitationView {
             const answer = invitation_block_answers.hasOwnProperty(blockId) ? invitation_block_answers[blockId] : null;
             const div = document.createElement("div");
             div.classList.add("block");
-            div.appendChild(this.createBlock(block.template, block.content, answer, blockId, other_guests_answers, guestName, isOrganizer, onInputChange));
+            div.appendChild(this.createBlock(block.template, block.content, answer, blockId, other_guests_answers, guestData, isOrganizer, onInputChange));
             this.invitation_section.appendChild(div);
         });
     }
 
-    createBlock(template, content, answer_data, blockId, other_guests_answers, guestName, isOrganizer, onInputChange) {
+    createBlock(template, content, answer_data, blockId, other_guests_answers, guestData, isOrganizer, onInputChange) {
         if (['h1', 'h2', 'h3', 'p', 'code'].includes(template)) {
             const el = document.createElement(template);
-            el.textContent = this.personalizeContent(content, guestName);
+            el.textContent = this.personalizeContent(content, guestData);
             return el;
         } else {
             switch (template) {
                 case 'multiple_choice':
-                    return this.createMultipleChoice(content, answer_data, blockId, other_guests_answers, guestName, isOrganizer, onInputChange);
+                    return this.createMultipleChoice(content, answer_data, blockId, other_guests_answers, guestData, isOrganizer, onInputChange);
                 case 'single_choice':
-                    return this.createSingleChoice(content, answer_data, blockId, other_guests_answers, guestName, isOrganizer, onInputChange);
+                    return this.createSingleChoice(content, answer_data, blockId, other_guests_answers, guestData, isOrganizer, onInputChange);
                 case 'text_input':
-                    return this.createTextInput(content, answer_data, blockId, other_guests_answers, guestName, isOrganizer, onInputChange);
+                    return this.createTextInput(content, answer_data, blockId, other_guests_answers, guestData, isOrganizer, onInputChange);
                 case 'number_input':
-                    return this.createNumberInput(content, answer_data, blockId, other_guests_answers, guestName, isOrganizer, onInputChange);
+                    return this.createNumberInput(content, answer_data, blockId, other_guests_answers, guestData, isOrganizer, onInputChange);
                 default:
                     return this.templates.error.content.cloneNode(true);
             }
         }
     }
 
-    createMultipleChoice(content, answer_data, blockId, other_guests_answers, guestName, isOrganizer, onInputChange) {
+    createMultipleChoice(content, answer_data, blockId, other_guests_answers, guestData, isOrganizer, onInputChange) {
         const mc = this.templates.multiple_choice.content.cloneNode(true);
         let mcContent;
         try {
@@ -125,7 +141,7 @@ class InvitationView {
             mcContent = { label: content, options: ["Yes", "No"] };
         }
 
-        mc.querySelector("label").textContent = this.personalizeContent(mcContent.label, guestName);
+        mc.querySelector("label").textContent = this.personalizeContent(mcContent.label, guestData);
         const ul = mc.querySelector('ul');
 
         const currentAnswer = answer_data || [];
@@ -144,7 +160,7 @@ class InvitationView {
                 if (blockAnswerData) {
                     const blockAnswer = blockAnswerData.answer;
                     const guestName = blockAnswerData.guest_name;
-                    
+
                     if (Array.isArray(blockAnswer)) {
                         blockAnswer.forEach((selected, optionIndex) => {
                             if (selected && optionIndex < optionCounts.length) {
@@ -209,7 +225,7 @@ class InvitationView {
                         if (blockAnswerData) {
                             const blockAnswer = blockAnswerData.answer;
                             const guestName = blockAnswerData.guest_name;
-                            
+
                             if (Array.isArray(blockAnswer)) {
                                 blockAnswer.forEach((selected, optionIndex) => {
                                     if (selected && optionIndex < updatedCounts.length) {
@@ -259,7 +275,7 @@ class InvitationView {
         return mc;
     }
 
-    createSingleChoice(content, answer_data, blockId, other_guests_answers, guestName, isOrganizer, onInputChange) {
+    createSingleChoice(content, answer_data, blockId, other_guests_answers, guestData, isOrganizer, onInputChange) {
         const sc = this.templates.single_choice.content.cloneNode(true);
         let scContent;
         try {
@@ -268,7 +284,7 @@ class InvitationView {
             scContent = { label: content, options: ["Yes", "No"] };
         }
 
-        sc.querySelector("label").textContent = this.personalizeContent(scContent.label, guestName);
+        sc.querySelector("label").textContent = this.personalizeContent(scContent.label, guestData);
         const ul = sc.querySelector('ul');
 
         const currentAnswer = answer_data !== undefined && answer_data !== null ? answer_data : -1; // Single choice uses index, -1 means no selection
@@ -288,7 +304,7 @@ class InvitationView {
                 if (blockAnswerData) {
                     const blockAnswer = blockAnswerData.answer;
                     const guestName = blockAnswerData.guest_name;
-                    
+
                     if (typeof blockAnswer === 'number' && blockAnswer >= 0 && blockAnswer < optionCounts.length) {
                         optionCounts[blockAnswer]++;
                         optionGuestNames[blockAnswer].push(guestName);
@@ -348,7 +364,7 @@ class InvitationView {
                         if (blockAnswerData) {
                             const blockAnswer = blockAnswerData.answer;
                             const guestName = blockAnswerData.guest_name;
-                            
+
                             if (typeof blockAnswer === 'number' && blockAnswer >= 0 && blockAnswer < updatedCounts.length) {
                                 updatedCounts[blockAnswer]++;
                                 updatedGuestNames[blockAnswer].push(guestName);
@@ -395,7 +411,7 @@ class InvitationView {
         return sc;
     }
 
-    createTextInput(content, answer_data, blockId, other_guests_answers, guestName, isOrganizer, onInputChange) {
+    createTextInput(content, answer_data, blockId, other_guests_answers, guestData, isOrganizer, onInputChange) {
         const ti = this.templates.text_input.content.cloneNode(true);
         const textInput = ti.querySelector("input");
 
@@ -414,7 +430,7 @@ class InvitationView {
         const label = typeof textContent === 'object' ? textContent.label : textContent;
         const isPublic = typeof textContent === 'object' && textContent.public === true;
 
-        ti.querySelector("label").textContent = this.personalizeContent(label, guestName);
+        ti.querySelector("label").textContent = this.personalizeContent(label, guestData);
         textInput.value = answer_data || '';
 
         textInput.addEventListener('input', () => {
@@ -429,7 +445,7 @@ class InvitationView {
                 if (blockAnswerData) {
                     const blockAnswer = blockAnswerData.answer;
                     const guestName = blockAnswerData.guest_name;
-                    
+
                     if (blockAnswer && typeof blockAnswer === 'string' && blockAnswer.trim() !== '') {
                         otherAnswers.push({ answer: blockAnswer, guest_name: guestName });
                     }
@@ -453,7 +469,7 @@ class InvitationView {
         return ti;
     }
 
-    createNumberInput(content, answer_data, blockId, other_guests_answers, guestName, isOrganizer, onInputChange) {
+    createNumberInput(content, answer_data, blockId, other_guests_answers, guestData, isOrganizer, onInputChange) {
         const ni = this.templates.number_input.content.cloneNode(true);
         const numberInput = ni.querySelector("input");
 
@@ -472,7 +488,7 @@ class InvitationView {
         const label = typeof numberContent === 'object' ? numberContent.label : numberContent;
         const isPublic = typeof numberContent === 'object' && numberContent.public === true;
 
-        ni.querySelector("label").textContent = this.personalizeContent(label, guestName);
+        ni.querySelector("label").textContent = this.personalizeContent(label, guestData);
         numberInput.value = answer_data || '';
 
         numberInput.addEventListener('input', () => {
@@ -487,7 +503,7 @@ class InvitationView {
                 if (blockAnswerData) {
                     const blockAnswer = blockAnswerData.answer;
                     const guestName = blockAnswerData.guest_name;
-                    
+
                     if (blockAnswer && typeof blockAnswer === 'string' && blockAnswer.trim() !== '') {
                         otherAnswers.push({ answer: blockAnswer, guest_name: guestName });
                     }
@@ -585,7 +601,7 @@ class InvitationController {
             data.invitation_blocks,
             data.invitation_block_answers || {},
             data.other_guests_answers || [],
-            data.guest_name, // Pass guest name to view
+            this.model.getGuestData(), // Pass guest data object for personalization
             data.is_organizer || false, // Pass organizer status to view
             (blockId, value) => this.model.setAnswer(blockId, value)
         );

@@ -25,7 +25,11 @@ A modern, minimalistic party invitation platform built with Rust (Actix Web), SQ
   - Automatic language detection based on browser preferences
   - Full German and English support
   - Informal German ("du") for friendly communication
-- 👤 **Name Personalization**: Use `{{name}}` in content to personalize invitations
+- 👤 **Guest Personalization**: Use template variables in your content:
+  - `{{salutation}}` - Guest's salutation (e.g., Mr., Ms., Dr.)
+  - `{{first}}` - Guest's first name
+  - `{{last}}` - Guest's last name
+  - `{{name}}` - Full name (first + last) for backward compatibility
 - 🔐 **Secure Authentication**: Token-based authentication for party organizers
 
 ## Quick Start

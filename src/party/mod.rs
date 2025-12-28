@@ -182,16 +182,21 @@ async fn get_party_details(
     let invitation_blocks = party.get_invitation_blocks_json();
 
     // Get all guests for this party
-    let guests_result = conn.prepare("SELECT g.id, g.name, i.organizer, i.id FROM guests g INNER JOIN invitations i ON g.id = i.guest_id WHERE i.party_id = ?1")
+    let guests_result = conn.prepare("SELECT g.id, g.salutation, g.first, g.last, i.organizer, i.id FROM guests g INNER JOIN invitations i ON g.id = i.guest_id WHERE i.party_id = ?1")
         .and_then(|mut stmt| {
             let guest_iter = stmt.query_map([&party_id], |row| {
                 let guest_id: String = row.get(0)?;
-                let guest_name: String = row.get(1)?;
-                let organizer: bool = row.get(2)?;
-                let invitation_id: String = row.get(3)?;
+                let salutation: String = row.get(1)?;
+                let first: String = row.get(2)?;
+                let last: String = row.get(3)?;
+                let organizer: bool = row.get(4)?;
+                let invitation_id: String = row.get(5)?;
                 Ok(json!({
                     "id": guest_id,
-                    "name": guest_name,
+                    "salutation": salutation,
+                    "first": first,
+                    "last": last,
+                    "name": format!("{} {}", first, last).trim(),
                     "organizer": organizer,
                     "invitation_id": invitation_id
                 }))
