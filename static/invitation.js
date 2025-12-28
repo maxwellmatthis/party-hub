@@ -39,12 +39,14 @@ class InvitationModel {
     }
 
     getGuestData() {
-        if (!this.invitationData) return { name: '', salutation: '', first: '', last: '' };
+        if (!this.invitationData) return { name: '', salutation: '', first: '', last: '', date: '', time: '' };
         return {
             name: this.invitationData.guest_name || '',
             salutation: this.invitationData.guest_salutation || '',
             first: this.invitationData.guest_first || '',
-            last: this.invitationData.guest_last || ''
+            last: this.invitationData.guest_last || '',
+            date: this.invitationData.party_date || '',
+            time: this.invitationData.party_time || ''
         };
     }
 
@@ -71,6 +73,8 @@ class InvitationView {
             multiple_choice_item: document.querySelector("template#multiple-choice-item"),
             single_choice: document.querySelector("template#single-choice"),
             single_choice_item: document.querySelector("template#single-choice-item"),
+            attendance: document.querySelector("template#attendance"),
+            attendance_item: document.querySelector("template#attendance-item"),
             text_input: document.querySelector("template#text-input"),
             number_input: document.querySelector("template#number-input"),
             public_stats: document.querySelector("template#public-stats"),
@@ -92,6 +96,8 @@ class InvitationView {
                 personalized = personalized.replace(/\{\{first\}\}/g, guestData.first || '');
                 personalized = personalized.replace(/\{\{last\}\}/g, guestData.last || '');
                 personalized = personalized.replace(/\{\{name\}\}/g, guestData.name || '');
+                personalized = personalized.replace(/\{\{date\}\}/g, guestData.date || '');
+                personalized = personalized.replace(/\{\{time\}\}/g, guestData.time || '');
             }
             return personalized;
         }
@@ -122,6 +128,8 @@ class InvitationView {
                     return this.createMultipleChoice(content, answer_data, blockId, other_guests_answers, guestData, isOrganizer, onInputChange);
                 case 'single_choice':
                     return this.createSingleChoice(content, answer_data, blockId, other_guests_answers, guestData, isOrganizer, onInputChange);
+                case 'attendance':
+                    return this.createAttendance(content, answer_data, blockId, other_guests_answers, guestData, isOrganizer, onInputChange);
                 case 'text_input':
                     return this.createTextInput(content, answer_data, blockId, other_guests_answers, guestData, isOrganizer, onInputChange);
                 case 'number_input':
@@ -411,6 +419,142 @@ class InvitationView {
         return sc;
     }
 
+    createAttendance(content, answer_data, blockId, other_guests_answers, guestData, isOrganizer, onInputChange) {
+        const at = this.templates.attendance.content.cloneNode(true);
+        let atContent;
+        try {
+            atContent = typeof content === 'string' ? JSON.parse(content) : content;
+        } catch {
+            atContent = { label: content, options: ["Yes", "Maybe", "No"] };
+        }
+
+        // If no options specified, use default attendance options
+        if (!atContent.options || atContent.options.length === 0) {
+            atContent.options = ["Yes", "Maybe", "No"];
+        }
+
+        at.querySelector("label").textContent = this.personalizeContent(atContent.label, guestData);
+        const ul = at.querySelector('ul');
+
+        const currentAnswer = answer_data !== undefined && answer_data !== null ? answer_data : -1;
+        const isPublic = atContent.public === true;
+        const radioGroupName = `attendance_${blockId}`;
+
+        // Calculate stats if this block is public or user is organizer
+        let optionCounts = [];
+        let optionGuestNames = [];
+        if ((isPublic || isOrganizer) && other_guests_answers) {
+            optionCounts = new Array(atContent.options.length).fill(0);
+            optionGuestNames = new Array(atContent.options.length).fill().map(() => []);
+
+            // Include other guests' answers
+            other_guests_answers.forEach(guestAnswers => {
+                const blockAnswerData = guestAnswers[blockId];
+                if (blockAnswerData) {
+                    const blockAnswer = blockAnswerData.answer;
+                    const guestName = blockAnswerData.guest_name;
+
+                    if (typeof blockAnswer === 'number' && blockAnswer >= 0 && blockAnswer < optionCounts.length) {
+                        optionCounts[blockAnswer]++;
+                        optionGuestNames[blockAnswer].push(guestName);
+                    }
+                }
+            });
+
+            // Include current user's answer
+            if (typeof currentAnswer === 'number' && currentAnswer >= 0 && currentAnswer < optionCounts.length) {
+                optionCounts[currentAnswer]++;
+            }
+        }
+
+        atContent.options.forEach((o, i) => {
+            const ati = this.templates.attendance_item.content.cloneNode(true);
+            const li = ati.querySelector('li');
+            const radio = li.querySelector('input');
+            const span = li.querySelector('span');
+
+            radio.name = radioGroupName;
+            radio.value = i;
+
+            // Set option text with public stats and guest names if available
+            if ((isPublic || isOrganizer) && optionCounts.length > 0) {
+                const count = optionCounts[i] || 0;
+                const names = optionGuestNames[i] || [];
+                if (names.length > 0) {
+                    span.textContent = `${o} (${count}) - ${names.join(', ')}`;
+                } else {
+                    span.textContent = `${o} (${count})`;
+                }
+            } else {
+                span.textContent = o;
+            }
+
+            radio.checked = currentAnswer === i;
+
+            const updateAnswer = () => {
+                const selectedRadio = ul.querySelector('input[type="radio"]:checked');
+                const selectedIndex = selectedRadio ? parseInt(selectedRadio.value) : -1;
+                onInputChange(blockId, selectedIndex);
+
+                // Update stats in real-time
+                updateStatsDisplay();
+            };
+
+            const updateStatsDisplay = () => {
+                if ((isPublic || isOrganizer) && optionCounts.length > 0) {
+                    const updatedCounts = new Array(atContent.options.length).fill(0);
+                    const updatedGuestNames = new Array(atContent.options.length).fill().map(() => []);
+
+                    other_guests_answers.forEach(guestAnswers => {
+                        const blockAnswerData = guestAnswers[blockId];
+                        if (blockAnswerData) {
+                            const blockAnswer = blockAnswerData.answer;
+                            const guestName = blockAnswerData.guest_name;
+
+                            if (typeof blockAnswer === 'number' && blockAnswer >= 0 && blockAnswer < updatedCounts.length) {
+                                updatedCounts[blockAnswer]++;
+                                updatedGuestNames[blockAnswer].push(guestName);
+                            }
+                        }
+                    });
+
+                    const selectedRadio = ul.querySelector('input[type="radio"]:checked');
+                    if (selectedRadio) {
+                        const selectedIndex = parseInt(selectedRadio.value);
+                        if (selectedIndex >= 0 && selectedIndex < updatedCounts.length) {
+                            updatedCounts[selectedIndex]++;
+                        }
+                    }
+
+                    atContent.options.forEach((o, i) => {
+                        const currentSpan = ul.querySelectorAll('span')[i];
+                        if (currentSpan) {
+                            const count = updatedCounts[i] || 0;
+                            const names = updatedGuestNames[i] || [];
+                            if (names.length > 0) {
+                                currentSpan.textContent = `${o} (${count}) - ${names.join(', ')}`;
+                            } else {
+                                currentSpan.textContent = `${o} (${count})`;
+                            }
+                        }
+                    });
+                }
+            };
+
+            radio.addEventListener('change', updateAnswer);
+
+            li.addEventListener('click', function (e) {
+                if (e.target !== radio) {
+                    radio.checked = true;
+                    updateAnswer();
+                }
+            });
+
+            ul.appendChild(li);
+        });
+        return at;
+    }
+
     createTextInput(content, answer_data, blockId, other_guests_answers, guestData, isOrganizer, onInputChange) {
         const ti = this.templates.text_input.content.cloneNode(true);
         const textInput = ti.querySelector("input");
@@ -546,9 +690,16 @@ class InvitationView {
                 }, 2000);
                 break;
             case 'error':
-                saveButton.textContent = this.templates.status_save.content.textContent;
-                saveButton.disabled = false;
-                alert(message || this.templates.error_save_failed.content.textContent);
+                // Show error message in the button itself
+                saveButton.textContent = message || this.templates.error_save_failed.content.textContent;
+                saveButton.style.background = "#dc3545";
+                saveButton.style.color = "#ffffff";
+                setTimeout(() => {
+                    saveButton.textContent = this.templates.status_save.content.textContent;
+                    saveButton.style.background = "";
+                    saveButton.style.color = "";
+                    saveButton.disabled = false;
+                }, 4000);
                 break;
         }
     }

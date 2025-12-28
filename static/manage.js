@@ -46,12 +46,16 @@ const templateEditGuest = document.querySelector("template#edit-guest");
 let currentPartyId = null;
 let allGuests = [];
 let currentPartyGuests = [];
+let hasRsvpBlock = false;
 
 let blockOrder = [];
 
 function initializeBlockEditor(container, blocks) {
     container.innerHTML = '';
     blockOrder = [];
+
+    // Check if any block is an attendance block
+    hasRsvpBlock = blocks.some(block => block.template === 'attendance');
 
     addInsertionPoint(container, 0);
 
@@ -79,19 +83,30 @@ function createInvitationBlock(blockId, blockData = {}) {
     const typeSelect = blockElement.querySelector('.block-type-select');
     const contentTextarea = blockElement.querySelector('textarea');
     const optionsInput = blockElement.querySelector('input[type="text"]');
+    const attendanceOptionsDiv = blockElement.querySelector('.attendance-options');
+    const attendanceOption1 = blockElement.querySelector('.attendance-option-1');
+    const attendanceOption2 = blockElement.querySelector('.attendance-option-2');
+    const attendanceOption3 = blockElement.querySelector('.attendance-option-3');
     const visibilitySelect = blockElement.querySelector('select[name="visibility"]');
 
     const template = blockData.template || 'p';
     typeSelect.value = template;
 
     // Handle content based on block type
-    if (['single_choice', 'multiple_choice', 'text_input', 'number_input'].includes(template)) {
+    if (['single_choice', 'multiple_choice', 'text_input', 'number_input', 'attendance'].includes(template)) {
         // For question types, parse JSON content
         try {
             const questionData = JSON.parse(blockData.content || '{}');
             contentTextarea.value = questionData.label || '';
             if (questionData.options && Array.isArray(questionData.options)) {
-                optionsInput.value = questionData.options.join(', ');
+                if (template === 'attendance') {
+                    // For attendance, populate three separate inputs
+                    attendanceOption1.value = questionData.options[0] || '';
+                    attendanceOption2.value = questionData.options[1] || '';
+                    attendanceOption3.value = questionData.options[2] || '';
+                } else {
+                    optionsInput.value = questionData.options.join(', ');
+                }
             }
             visibilitySelect.value = questionData.public ? 'public' : 'private';
         } catch (e) {
@@ -105,25 +120,55 @@ function createInvitationBlock(blockId, blockData = {}) {
         contentTextarea.value = blockData.content || '';
     }
 
-    typeSelect.addEventListener('change', (e) => updateBlockVisibility(blockDiv, e.target.value));
+    typeSelect.addEventListener('change', (e) => {
+        updateBlockVisibility(blockDiv, e.target.value);
+        updateAttendanceAvailability();
+    });
 
     const deleteBtn = blockElement.querySelector('.block-delete');
     deleteBtn.addEventListener('click', () => deleteBlock(blockId));
 
     updateBlockVisibility(blockDiv, typeSelect.value);
+    updateAttendanceAvailability();
 
     return blockElement;
 }
 
 function updateBlockVisibility(blockDiv, blockType) {
     const optionsInput = blockDiv.querySelector('input[type="text"]');
+    const attendanceOptionsDiv = blockDiv.querySelector('.attendance-options');
     const visibilitySelect = blockDiv.querySelector('select[name="visibility"]');
 
+    // Show attendance options only for attendance type
+    if (attendanceOptionsDiv) {
+        attendanceOptionsDiv.style.display = blockType === 'attendance' ? 'block' : 'none';
+    }
+
+    // Show regular options input for single/multiple choice (but not attendance)
     const isChoiceQuestion = ['single_choice', 'multiple_choice'].includes(blockType);
     optionsInput.style.display = isChoiceQuestion ? 'block' : 'none';
 
-    const isQuestion = ['single_choice', 'multiple_choice', 'text_input', 'number_input'].includes(blockType);
+    const isQuestion = ['single_choice', 'multiple_choice', 'text_input', 'number_input', 'attendance'].includes(blockType);
     visibilitySelect.style.display = isQuestion ? 'block' : 'none';
+}
+
+function updateAttendanceAvailability() {
+    // Check if any block currently has attendance type
+    const hasAttendance = Array.from(document.querySelectorAll('.block-type-select')).some(
+        select => select.value === 'attendance'
+    );
+    
+    // Update global flag
+    hasRsvpBlock = hasAttendance;
+    
+    // Disable/enable attendance option in all block type selects
+    document.querySelectorAll('.block-type-select').forEach(select => {
+        const attendanceOption = Array.from(select.options).find(opt => opt.value === 'attendance');
+        if (attendanceOption) {
+            // Disable if there's an attendance block and this select isn't set to attendance
+            attendanceOption.disabled = hasAttendance && select.value !== 'attendance';
+        }
+    });
 }
 
 function addInsertionPoint(container, position) {
@@ -191,12 +236,17 @@ function rebuildBlockEditor(container) {
         container.appendChild(blockElement);
         addInsertionPoint(container, index + 1);
     });
+    
+    updateAttendanceAvailability();
 }
 
 function getBlockData(blockElement) {
     const typeSelect = blockElement.querySelector('.block-type-select');
     const contentTextarea = blockElement.querySelector('textarea');
     const optionsInput = blockElement.querySelector('input[type="text"]');
+    const attendanceOption1 = blockElement.querySelector('.attendance-option-1');
+    const attendanceOption2 = blockElement.querySelector('.attendance-option-2');
+    const attendanceOption3 = blockElement.querySelector('.attendance-option-3');
     const visibilitySelect = blockElement.querySelector('select[name="visibility"]');
 
     const template = typeSelect?.value || 'p';
@@ -204,13 +254,19 @@ function getBlockData(blockElement) {
     const rawOptions = optionsInput?.value || '';
     const visibility = visibilitySelect?.value || 'private';
 
-    if (['single_choice', 'multiple_choice', 'text_input', 'number_input'].includes(template)) {
+    if (['single_choice', 'multiple_choice', 'text_input', 'number_input', 'attendance'].includes(template)) {
         const questionData = {
             label: rawContent,
             public: visibility === 'public'
         };
 
-        if (['single_choice', 'multiple_choice'].includes(template) && rawOptions) {
+        if (template === 'attendance') {
+            // For attendance, get values from three separate inputs
+            const opt1 = attendanceOption1?.value.trim() || 'Yes';
+            const opt2 = attendanceOption2?.value.trim() || 'Maybe';
+            const opt3 = attendanceOption3?.value.trim() || 'No';
+            questionData.options = [opt1, opt2, opt3];
+        } else if (['single_choice', 'multiple_choice'].includes(template) && rawOptions) {
             questionData.options = rawOptions.split(',').map(opt => opt.trim()).filter(opt => opt);
         }
 
@@ -292,7 +348,28 @@ async function renderParty(partyId) {
         const p = templateEditParty.content.cloneNode(true);
 
         const nameInput = p.querySelector("input#party-name-input");
+        const dateInput = p.querySelector("input#party-date-input");
+        const respondUntilInput = p.querySelector("input#party-respond-until-input");
+        const maxGuestsInput = p.querySelector("input#party-max-guests-input");
+        const maxGuestsContainer = p.querySelector("#max-guests-container");
+        const frozenInput = p.querySelector("input#party-frozen-input");
+        const publicInput = p.querySelector("input#party-public-input");
+
         nameInput.value = partyDetails.name;
+        dateInput.value = partyDetails.date || '';
+        respondUntilInput.value = partyDetails.respond_until || '';
+        maxGuestsInput.value = partyDetails.max_guests || 0;
+        frozenInput.checked = partyDetails.frozen || false;
+        publicInput.checked = partyDetails.public || false;
+
+        // Show/hide max guests based on public checkbox
+        const toggleMaxGuests = () => {
+            if (maxGuestsContainer) {
+                maxGuestsContainer.style.display = publicInput.checked ? 'block' : 'none';
+            }
+        };
+        toggleMaxGuests();
+        publicInput.addEventListener('change', toggleMaxGuests);
 
         p.querySelector("#save-party-btn").addEventListener('click', () => saveParty(partyId));
         p.querySelector("#delete-party-btn").addEventListener('click', () => deleteParty(partyId));
@@ -563,6 +640,12 @@ async function addGuestToParty(guestId, guestName) {
 async function saveParty(partyId) {
     try {
         const nameInput = document.querySelector("input#party-name-input");
+        const dateInput = document.querySelector("input#party-date-input");
+        const respondUntilInput = document.querySelector("input#party-respond-until-input");
+        const maxGuestsInput = document.querySelector("input#party-max-guests-input");
+        const frozenInput = document.querySelector("input#party-frozen-input");
+        const publicInput = document.querySelector("input#party-public-input");
+
         if (!nameInput) {
             showToast('Error: Could not find party name input', 'error');
             return;
@@ -588,7 +671,12 @@ async function saveParty(partyId) {
 
         const updateData = {
             name: partyName,
-            invitation_blocks: JSON.stringify(invitationBlocks)
+            invitation_blocks: JSON.stringify(invitationBlocks),
+            date: dateInput ? dateInput.value : '',
+            respond_until: respondUntilInput ? respondUntilInput.value : '',
+            max_guests: maxGuestsInput ? parseInt(maxGuestsInput.value) || 0 : 0,
+            frozen: frozenInput ? frozenInput.checked : false,
+            public: publicInput ? publicInput.checked : false
         };
 
         const response = await fetch(`/party/${partyId}/update`, {

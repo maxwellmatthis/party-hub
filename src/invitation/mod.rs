@@ -7,6 +7,51 @@ use serde::Deserialize;
 use serde_json::json;
 use std::fs;
 
+// Helper function to format date and time based on language
+// Expects ISO datetime format: YYYY-MM-DD or YYYY-MM-DDTHH:MM or YYYY-MM-DDTHH:MM:SS
+fn format_date_time(date_str: &str, language: &str) -> (String, String) {
+    if date_str.is_empty() {
+        return (String::new(), String::new());
+    }
+
+    // Try to parse as full datetime first (with seconds)
+    if let Ok(datetime) = chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S") {
+        let formatted_date = match language {
+            "de" => datetime.format("%d.%m.%Y").to_string(), // DD.MM.YYYY
+            _ => datetime.format("%m/%d/%Y").to_string(),     // MM/DD/YYYY (English)
+        };
+        let formatted_time = match language {
+            "de" => datetime.format("%H:%M").to_string(), // 24-hour
+            _ => datetime.format("%I:%M %p").to_string(), // 12-hour with AM/PM
+        };
+        return (formatted_date, formatted_time);
+    }
+
+    // Try to parse as datetime without seconds (datetime-local format)
+    if let Ok(datetime) = chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M") {
+        let formatted_date = match language {
+            "de" => datetime.format("%d.%m.%Y").to_string(),
+            _ => datetime.format("%m/%d/%Y").to_string(),
+        };
+        let formatted_time = match language {
+            "de" => datetime.format("%H:%M").to_string(),
+            _ => datetime.format("%I:%M %p").to_string(),
+        };
+        return (formatted_date, formatted_time);
+    }
+
+    // Fallback to date-only format
+    if let Ok(date) = chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
+        let formatted_date = match language {
+            "de" => date.format("%d.%m.%Y").to_string(),
+            _ => date.format("%m/%d/%Y").to_string(),
+        };
+        return (formatted_date, String::new());
+    }
+
+    (String::new(), String::new())
+}
+
 #[get("/{invitation_id}")]
 pub async fn invitation_page(
     path: web::Path<String>,
@@ -54,6 +99,7 @@ pub async fn invitation_page(
 #[get("/{invitation_id}")]
 async fn details(
     path: web::Path<String>,
+    req: actix_web::HttpRequest,
     db: web::Data<Pool<SqliteConnectionManager>>,
 ) -> impl Responder {
     let invitation_id = path.into_inner();
@@ -90,17 +136,25 @@ async fn details(
     // Create full name for backward compatibility
     let guest_name = format!("{} {}", guest_first, guest_last).trim().to_string();
 
-    let invitation_blocks = match conn
-        .prepare("SELECT invitation_blocks FROM parties WHERE id = ?1")
+    // Get invitation blocks, party date, and has_rsvp_block flag
+    let (invitation_blocks, party_date, has_rsvp_block) = match conn
+        .prepare("SELECT invitation_blocks, date, has_rsvp_block FROM parties WHERE id = ?1")
         .and_then(|mut stmt| {
             stmt.query_row([&invitation.party_id], |row| {
                 let invitation_blocks: String = row.get(0)?;
-                Ok(invitation_blocks)
+                let date: String = row.get(1)?;
+                let has_rsvp_block: bool = row.get(2)?;
+                Ok((invitation_blocks, date, has_rsvp_block))
             })
         }) {
-        Ok(invitation_blocks) => invitation_blocks,
+        Ok(data) => data,
         Err(_) => return HttpResponse::InternalServerError().body("Party data not found"),
     };
+
+    // Format date and time based on language
+    let language = detect_language(&req);
+    let (formatted_date, formatted_time) = format_date_time(&party_date, &language);
+
 
     // Get all other guests' answers for the same party (excluding current invitation)
     // Include guest names for organizer view
@@ -128,15 +182,23 @@ async fn details(
         Err(_) => Vec::new(),
     };
 
-    // Parse invitation blocks to determine which are public
+    // Parse invitation blocks to determine which are public and find attendance block
     let blocks_json =
         serde_json::from_str::<serde_json::Value>(&invitation_blocks).unwrap_or(json!([]));
     let mut public_block_ids = std::collections::HashSet::new();
+    let mut attendance_block_id: Option<String> = None;
 
     if let Some(blocks_array) = blocks_json.as_array() {
         for block in blocks_array.iter() {
             // Get the block ID
             if let Some(block_id) = block.get("id").and_then(|v| v.as_str()) {
+                // Check if this is an attendance block
+                if let Some(template) = block.get("template").and_then(|v| v.as_str()) {
+                    if template == "attendance" {
+                        attendance_block_id = Some(block_id.to_string());
+                    }
+                }
+                
                 if let Some(content) = block.get("content") {
                     // Try to parse content as JSON to check for public flag
                     if let Ok(content_obj) =
@@ -158,16 +220,39 @@ async fn details(
     // Filter other guests' answers based on organizer status and visibility
     let filtered_other_answers: Vec<serde_json::Value> = if invitation.organizer {
         // Organizers can see all answers with guest names
+        // Mark answers from guests who haven't RSVP'd yes with "(?)" (only if has_rsvp_block is true)
         all_other_answers
             .into_iter()
             .map(|(guest_answers, guest_name)| {
+                // Only check RSVP status if the party has an RSVP block
+                let has_rsvped_yes = if has_rsvp_block {
+                    if let Some(attendance_id) = &attendance_block_id {
+                        guest_answers
+                            .get(attendance_id)
+                            .and_then(|v| v.as_i64())
+                            .map(|answer| answer == 0)
+                            .unwrap_or(false)
+                    } else {
+                        true // No attendance block found, so don't mark
+                    }
+                } else {
+                    true // No RSVP block in party, so don't apply RSVP filtering
+                };
+
                 let mut answer_with_names = serde_json::Map::new();
                 if let Some(answers_obj) = guest_answers.as_object() {
                     for (block_id, answer) in answers_obj {
                         // Create answer object with guest name
+                        // Add (?) if not RSVP'd yes, but not for the attendance block itself
+                        let is_attendance_block = Some(block_id.as_str()) == attendance_block_id.as_deref();
+                        let display_name = if has_rsvped_yes || is_attendance_block || !has_rsvp_block {
+                            guest_name.clone()
+                        } else {
+                            format!("{} (?)", guest_name)
+                        };
                         let answer_with_name = json!({
                             "answer": answer,
-                            "guest_name": guest_name
+                            "guest_name": display_name
                         });
                         answer_with_names.insert(block_id.clone(), answer_with_name);
                     }
@@ -177,23 +262,52 @@ async fn details(
             .collect()
     } else {
         // Regular guests can only see public answers with guest names
+        // Filter out answers from guests who haven't RSVP'd yes (only if has_rsvp_block is true)
+        // Exception: the attendance block itself should always show all responses if public
         all_other_answers
             .into_iter()
-            .map(|(guest_answers, guest_name)| {
+            .filter_map(|(guest_answers, guest_name)| {
+                // Only check RSVP status if the party has an RSVP block
+                let has_rsvped_yes = if has_rsvp_block {
+                    if let Some(attendance_id) = &attendance_block_id {
+                        guest_answers
+                            .get(attendance_id)
+                            .and_then(|v| v.as_i64())
+                            .map(|answer| answer == 0)
+                            .unwrap_or(false)
+                    } else {
+                        true // No attendance block found, so include all answers
+                    }
+                } else {
+                    true // No RSVP block in party, so don't apply RSVP filtering
+                };
+
                 let mut filtered_guest = serde_json::Map::new();
                 if let Some(answers_obj) = guest_answers.as_object() {
                     for (block_id, answer) in answers_obj {
                         if public_block_ids.contains(block_id) {
-                            // Create answer object with guest name for public answers
-                            let answer_with_name = json!({
-                                "answer": answer,
-                                "guest_name": guest_name
-                            });
-                            filtered_guest.insert(block_id.clone(), answer_with_name);
+                            // For the attendance block itself, always show all responses
+                            // For other blocks, only show if guest RSVP'd yes
+                            let is_attendance_block = Some(block_id.as_str()) == attendance_block_id.as_deref();
+                            
+                            if is_attendance_block || !has_rsvp_block || has_rsvped_yes {
+                                // Create answer object with guest name for public answers
+                                let answer_with_name = json!({
+                                    "answer": answer,
+                                    "guest_name": guest_name
+                                });
+                                filtered_guest.insert(block_id.clone(), answer_with_name);
+                            }
                         }
                     }
                 }
-                serde_json::Value::Object(filtered_guest)
+                
+                // Only include this guest if they have at least one visible answer
+                if filtered_guest.is_empty() {
+                    None
+                } else {
+                    Some(serde_json::Value::Object(filtered_guest))
+                }
             })
             .collect()
     };
@@ -206,6 +320,8 @@ async fn details(
         "guest_salutation": guest_salutation,
         "guest_first": guest_first,
         "guest_last": guest_last,
+        "party_date": formatted_date,
+        "party_time": formatted_time,
         "is_organizer": invitation.organizer,
     });
 
@@ -249,6 +365,55 @@ async fn save_answers(
             }));
         }
     };
+
+    // Check if party is frozen or deadline has passed
+    let (frozen, respond_until) = match conn
+        .prepare("SELECT frozen, respond_until FROM parties WHERE id = ?1")
+        .and_then(|mut stmt| {
+            stmt.query_row([&party_id], |row| {
+                let frozen: bool = row.get(0)?;
+                let respond_until: String = row.get(1)?;
+                Ok((frozen, respond_until))
+            })
+        }) {
+        Ok(data) => data,
+        Err(_) => {
+            return HttpResponse::InternalServerError().json(json!({
+                "error": "Failed to get party status"
+            }));
+        }
+    };
+
+    // Check if party is frozen
+    if frozen {
+        return HttpResponse::Forbidden().json(json!({
+            "error": "This party is frozen and no longer accepting responses"
+        }));
+    }
+
+    // Check if respond_until deadline has passed
+    if !respond_until.is_empty() {
+        let now = chrono::Local::now().naive_local();
+        
+        // Try to parse as datetime first (with or without seconds)
+        let deadline_passed = if let Ok(deadline) = chrono::NaiveDateTime::parse_from_str(&respond_until, "%Y-%m-%dT%H:%M:%S") {
+            now > deadline
+        } else if let Ok(deadline) = chrono::NaiveDateTime::parse_from_str(&respond_until, "%Y-%m-%dT%H:%M") {
+            now > deadline
+        } else if let Ok(deadline_date) = chrono::NaiveDate::parse_from_str(&respond_until, "%Y-%m-%d") {
+            // If only date, consider deadline as end of day
+            let deadline = deadline_date.and_hms_opt(23, 59, 59).unwrap_or(deadline_date.and_hms_opt(0, 0, 0).unwrap());
+            now > deadline
+        } else {
+            false
+        };
+
+        if deadline_passed {
+            return HttpResponse::Forbidden().json(json!({
+                "error": "The deadline for responding to this invitation has passed"
+            }));
+        }
+    }
 
     // Get valid block IDs from the party's invitation blocks
     let valid_block_ids = match conn

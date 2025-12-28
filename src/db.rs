@@ -13,6 +13,12 @@ pub struct Party {
     pub name: String,
     pub author: String,
     pub invitation_blocks: String, // Store as JSON string for simplicity
+    pub date: String, // ISO 8601 date string
+    pub respond_until: String, // ISO 8601 date string
+    pub frozen: bool,
+    pub public: bool,
+    pub max_guests: i64,
+    pub has_rsvp_block: bool,
 }
 
 impl Party {
@@ -22,6 +28,12 @@ impl Party {
             name: row.get("name")?,
             author: row.get("author")?,
             invitation_blocks: row.get("invitation_blocks")?,
+            date: row.get("date")?,
+            respond_until: row.get("respond_until")?,
+            frozen: row.get("frozen")?,
+            public: row.get("public")?,
+            max_guests: row.get("max_guests")?,
+            has_rsvp_block: row.get("has_rsvp_block")?,
         })
     }
 
@@ -34,7 +46,13 @@ impl Party {
     pub fn to_summary_json(&self) -> serde_json::Value {
         serde_json::json!({
             "id": self.id,
-            "name": self.name
+            "name": self.name,
+            "date": self.date,
+            "respond_until": self.respond_until,
+            "frozen": self.frozen,
+            "public": self.public,
+            "max_guests": self.max_guests,
+            "has_rsvp_block": self.has_rsvp_block
         })
     }
 }
@@ -127,7 +145,13 @@ pub fn prepare_db() -> Result<()> {
             id    TEXT PRIMARY KEY,
             name  TEXT NOT NULL,
             author TEXT NOT NULL,
-            invitation_blocks JSON
+            invitation_blocks JSON,
+            date TEXT NOT NULL DEFAULT '',
+            respond_until TEXT NOT NULL DEFAULT '',
+            frozen BOOLEAN NOT NULL DEFAULT FALSE,
+            public BOOLEAN NOT NULL DEFAULT FALSE,
+            max_guests INTEGER NOT NULL DEFAULT 0,
+            has_rsvp_block BOOLEAN NOT NULL DEFAULT FALSE
         )",
         (),
     )?;

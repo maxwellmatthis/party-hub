@@ -676,6 +676,9 @@ label {
 
 input[type="text"],
 input[type="email"],
+input[type="date"],
+input[type="datetime-local"],
+input[type="number"],
 textarea,
 select {
     width: 100%;
@@ -691,6 +694,9 @@ select {
 
 input[type="text"]:focus,
 input[type="email"]:focus,
+input[type="date"]:focus,
+input[type="datetime-local"]:focus,
+input[type="number"]:focus,
 textarea:focus,
 select:focus {
     outline: none;
@@ -705,6 +711,20 @@ textarea {
 
 select {
     cursor: pointer;
+}
+
+/* Checkbox styling */
+input[type="checkbox"] {
+    width: auto;
+    margin-right: 8px;
+    cursor: pointer;
+}
+
+label:has(input[type="checkbox"]) {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
 }
 
 /* Block Editor Styles */

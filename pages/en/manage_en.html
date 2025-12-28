@@ -22,6 +22,30 @@
                 <label for="party-name-input">Name</label>
                 <input type="text" id="party-name-input">
             </div>
+            <div>
+                <label for="party-date-input">Date & Time</label>
+                <input type="datetime-local" id="party-date-input">
+            </div>
+            <div>
+                <label for="party-respond-until-input">Respond Until</label>
+                <input type="datetime-local" id="party-respond-until-input">
+            </div>
+            <div>
+                <label>
+                    <input type="checkbox" id="party-frozen-input">
+                    Frozen (no more responses)
+                </label>
+            </div>
+            <div>
+                <label>
+                    <input type="checkbox" id="party-public-input">
+                    Public (anyone with the party ID can sign up)
+                </label>
+            </div>
+            <div id="max-guests-container" style="display: none; margin-left: 30px;">
+                <label for="party-max-guests-input">Max Guests (0 = unlimited)</label>
+                <input type="number" id="party-max-guests-input" min="0">
+            </div>
         </section>
         <section>
             <div class="section-header">
@@ -34,7 +58,7 @@
             <div id="invitation-blocks">
                 <!-- template#invitation-block with insertion points -->
             </div>
-            <span><b>Tip:</b> Use {{salutation}}, {{first}} or {{last}} in headers and text to place the invitee's name.</span>
+            <span><b>Tip:</b> Use {{salutation}}, {{first}}, {{last}}, {{date}}, or {{time}} in headers and text to personalize the invitation.</span>
         </section>
         <section class="action-buttons">
             <button id="save-party-btn">Save</button>
@@ -88,6 +112,7 @@
                     <option value="h3">Heading 3</option>
                     <option value="p">Paragraph</option>
                     <option value="code">Code</option>
+                    <option value="attendance">Attendance</option>
                     <option value="single_choice">Single Choice Question</option>
                     <option value="multiple_choice">Multiple Choice Question</option>
                     <option value="text_input">Text Question</option>
@@ -95,6 +120,11 @@
                 </select>
                 <textarea name="text" id="content-or-label" placeholder="Enter content or question..."></textarea>
                 <input type="text" id="options" placeholder="Option 1; Option 2; Option 3..." style="display: none;">
+                <div class="attendance-options" style="display: none;">
+                    <label>Option 1: <input type="text" class="attendance-option-1" placeholder="Yes"></label>
+                    <label>Option 2: <input type="text" class="attendance-option-2" placeholder="Maybe"></label>
+                    <label>Option 3: <input type="text" class="attendance-option-3" placeholder="No"></label>
+                </div>
                 <select name="visibility" id="visibility" style="display: none;">
                     <option value="public">Public</option>
                     <option value="private">Private</option>

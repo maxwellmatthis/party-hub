@@ -63,7 +63,7 @@ async fn get_parties(
 
     // Get all parties for this author
     let parties_result = conn
-        .prepare("SELECT id, name, author, invitation_blocks FROM parties WHERE author = ?1")
+        .prepare("SELECT id, name, author, invitation_blocks, date, respond_until, frozen, public, max_guests, has_rsvp_block FROM parties WHERE author = ?1")
         .and_then(|mut stmt| {
             let party_iter = stmt.query_map([&author_id], Party::from_row)?;
 
@@ -102,17 +102,29 @@ async fn create_party(
         // Create empty party with default values
         let default_name = "New Party";
         let default_invitation_blocks = "[]";
+        let default_date = "";
+        let default_respond_until = "";
+        let default_frozen = false;
+        let default_public = false;
+        let default_max_guests = 0;
+        let default_has_rsvp_block = false;
 
         let result = conn
             .prepare(
-                "INSERT INTO parties (id, name, invitation_blocks, author) VALUES (?1, ?2, ?3, ?4)",
+                "INSERT INTO parties (id, name, invitation_blocks, author, date, respond_until, frozen, public, max_guests, has_rsvp_block) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             )
             .and_then(|mut stmt| {
-                stmt.execute([
+                stmt.execute(rusqlite::params![
                     &party_id,
                     default_name,
                     default_invitation_blocks,
                     &author_id,
+                    default_date,
+                    default_respond_until,
+                    default_frozen,
+                    default_public,
+                    default_max_guests,
+                    default_has_rsvp_block,
                 ])
             });
 
@@ -166,7 +178,7 @@ async fn get_party_details(
     // Get party details, ensuring it belongs to the authenticated author
     let party = match conn
         .prepare(
-            "SELECT id, name, author, invitation_blocks FROM parties WHERE id = ?1 AND author = ?2",
+            "SELECT id, name, author, invitation_blocks, date, respond_until, frozen, public, max_guests, has_rsvp_block FROM parties WHERE id = ?1 AND author = ?2",
         )
         .and_then(|mut stmt| stmt.query_row([&party_id, &author_id], Party::from_row))
     {
@@ -216,6 +228,12 @@ async fn get_party_details(
     let response = json!({
         "id": party.id,
         "name": party.name,
+        "date": party.date,
+        "respond_until": party.respond_until,
+        "frozen": party.frozen,
+        "public": party.public,
+        "max_guests": party.max_guests,
+        "has_rsvp_block": party.has_rsvp_block,
         "invitation_blocks": invitation_blocks,
         "guests": guests
     });
@@ -227,6 +245,11 @@ async fn get_party_details(
 struct SavePartyForm {
     name: String,
     invitation_blocks: Option<String>,
+    date: Option<String>,
+    respond_until: Option<String>,
+    frozen: Option<bool>,
+    public: Option<bool>,
+    max_guests: Option<i64>,
 }
 
 #[post("/{party_id}/update")]
@@ -245,10 +268,42 @@ async fn update_party(
             Ok(true) => {
                 let conn = pool.get().unwrap();
                 let invitation_blocks = form.invitation_blocks.as_deref().unwrap_or("[]");
+                let date = form.date.as_deref().unwrap_or("");
+                let respond_until = form.respond_until.as_deref().unwrap_or("");
+                let frozen = form.frozen.unwrap_or(false);
+                let public = form.public.unwrap_or(false);
+                let max_guests = form.max_guests.unwrap_or(0);
+
+                // Validate attendance blocks: parse the JSON and count attendance blocks
+                let has_rsvp_block = match serde_json::from_str::<Vec<serde_json::Value>>(invitation_blocks) {
+                    Ok(blocks) => {
+                        let attendance_count = blocks.iter()
+                            .filter(|block| {
+                                block.get("template")
+                                    .and_then(|t| t.as_str())
+                                    .map(|t| t == "attendance")
+                                    .unwrap_or(false)
+                            })
+                            .count();
+
+                        if attendance_count > 1 {
+                            return HttpResponse::BadRequest().json(json!({
+                                "error": "Only one attendance block is allowed per party"
+                            }));
+                        }
+
+                        attendance_count == 1
+                    }
+                    Err(_) => {
+                        return HttpResponse::BadRequest().json(json!({
+                            "error": "Invalid invitation_blocks JSON"
+                        }));
+                    }
+                };
 
                 let result = conn
-                    .prepare("UPDATE parties SET name = ?1, invitation_blocks = ?2 WHERE id = ?3 AND author = ?4")
-                    .and_then(|mut stmt| stmt.execute([&form.name, invitation_blocks, &party_id, &author_id]));
+                    .prepare("UPDATE parties SET name = ?1, invitation_blocks = ?2, date = ?3, respond_until = ?4, frozen = ?5, public = ?6, max_guests = ?7, has_rsvp_block = ?8 WHERE id = ?9 AND author = ?10")
+                    .and_then(|mut stmt| stmt.execute(rusqlite::params![&form.name, invitation_blocks, date, respond_until, frozen, public, max_guests, has_rsvp_block, &party_id, &author_id]));
 
                 match result {
                     Ok(rows_affected) => {
