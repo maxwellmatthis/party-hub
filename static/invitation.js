@@ -603,7 +603,7 @@ class InvitationController {
         const invitationId = path.length > 0 ? path[0] : null;
         if (invitationId) {
             try {
-                const response = await fetch(`/details/${invitationId}`);
+                const response = await fetch(`/invitation/${invitationId}`);
                 if (!response.ok) throw new Error('Network response was not ok');
                 return await response.json();
             } catch (_error) { }
@@ -623,7 +623,7 @@ class InvitationController {
         try {
             this.view.showSaveStatus('saving');
 
-            const response = await fetch(`/details/${invitationId}`, {
+            const response = await fetch(`/invitation/${invitationId}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
