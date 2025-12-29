@@ -414,6 +414,15 @@ async function renderParty(partyId) {
         p.querySelector("#add-guest-btn").addEventListener('click', () => showAddGuestModal(partyId));
         p.querySelector("#add-block-btn").addEventListener('click', () => addInvitationBlock());
 
+        // Setup character counter for changelog
+        const changelogInput = p.querySelector("textarea#party-changelog-input");
+        const charCount = p.querySelector("#changelog-char-count");
+        if (changelogInput && charCount) {
+            changelogInput.addEventListener('input', () => {
+                charCount.textContent = changelogInput.value.length;
+            });
+        }
+
         const guestsContainer = p.querySelector("div#guests");
         partyDetails.guests.forEach(guest => {
             const guestElement = templateGuest.content.cloneNode(true);
@@ -694,6 +703,7 @@ async function saveParty(partyId) {
         const maxGuestsInput = document.querySelector("input#party-max-guests-input");
         const frozenInput = document.querySelector("input#party-frozen-input");
         const publicInput = document.querySelector("input#party-public-input");
+        const changelogInput = document.querySelector("textarea#party-changelog-input");
 
         if (!nameInput) {
             showToast('Error: Could not find party name input', 'error');
@@ -727,7 +737,8 @@ async function saveParty(partyId) {
             respond_until: respondUntilInput ? respondUntilInput.value : '',
             max_guests: maxGuestsInput ? parseInt(maxGuestsInput.value) || 0 : 0,
             frozen: frozenInput ? frozenInput.checked : false,
-            public: publicInput ? publicInput.checked : false
+            public: publicInput ? publicInput.checked : false,
+            changelog: changelogInput ? changelogInput.value.trim() : ''
         };
 
         const response = await fetch(`/party/${partyId}/update`, {
@@ -742,6 +753,9 @@ async function saveParty(partyId) {
         if (response.ok) {
             const _result = await response.json();
             showToast('Party saved successfully!', 'success');
+            if (changelogInput) {
+                changelogInput.value = '';
+            }
             renderParties();
         } else {
             const error = await response.json();

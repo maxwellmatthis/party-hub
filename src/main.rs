@@ -7,6 +7,7 @@ mod auth;
 mod db;
 mod guest;
 mod invitation;
+mod notification;
 mod party;
 
 #[get("/static/{filename}")]
@@ -36,6 +37,8 @@ async fn serve_static(path: web::Path<String>) -> impl Responder {
         "favicon.ico",
         "x.svg",
         "public_guest.js",
+        "manifest.json",
+        "web-push.js"
     ];
 
     // Check if the requested file is in the whitelist
@@ -72,6 +75,21 @@ async fn serve_static(path: web::Path<String>) -> impl Responder {
         .body(file_content)
 }
 
+#[get("/web-push-service-worker.js")]
+async fn serve_service_worker() -> impl Responder {
+    let file_path = "static/web-push-service-worker.js";
+    
+    let file_content = match fs::read(file_path) {
+        Ok(content) => content,
+        Err(_) => return HttpResponse::NotFound().body("Service worker not found"),
+    };
+
+    HttpResponse::Ok()
+        .content_type("application/javascript")
+        .insert_header(("Service-Worker-Allowed", "/"))
+        .body(file_content)
+}
+
 fn detect_language(req: &actix_web::HttpRequest) -> String {
     if let Some(accept_lang) = req.headers().get("accept-language") {
         if let Ok(lang_str) = accept_lang.to_str() {
@@ -102,20 +120,71 @@ async fn main() -> std::io::Result<()> {
         .parse::<u16>()
         .unwrap_or(8080);
 
-    println!("INFO: Starting Party Hub server on http://127.0.0.1:{}", port);
+    println!(
+        "INFO: Starting Party Hub server on http://127.0.0.1:{}",
+        port
+    );
     match env::var("ENV") {
         Ok(val) => {
             println!("INFO: Running in {val} mode.")
-        },
-        Err(_e) => println!("WARNING: No ENV found in environment. Defaulting to production mode. FOR SECURITY REASONS COOKIES WILL NO WORK WITHOUT HTTPS.")
+        }
+        Err(_e) => println!(
+            "WARNING: No ENV found in environment. Defaulting to production mode. FOR SECURITY REASONS COOKIES WILL NO WORK WITHOUT HTTPS."
+        ),
+    }
+
+    // Check email configuration and warn if not set up properly
+    let smtp_client_configured = notification::is_smtp_client_configured();
+    let smtp_direct_configured = notification::is_smtp_direct_configured();
+    let mail_sendtype = env::var("MAIL_SENDTYPE").ok();
+    
+    match mail_sendtype.as_deref() {
+        Some("client") => {
+            if smtp_client_configured {
+                println!("INFO: Email notifications enabled via SMTP client (MAIL_SENDTYPE=client)");
+            } else {
+                println!("WARNING: MAIL_SENDTYPE set to 'client' but SMTP client not configured.");
+                println!("         Set SMTP_SERVER, SMTP_USERNAME, SMTP_PASSWORD, and SMTP_FROM to enable.");
+            }
+        }
+        Some("direct") => {
+            if smtp_direct_configured {
+                println!("INFO: Email notifications enabled via direct SMTP (MAIL_SENDTYPE=direct)");
+                println!("      Make sure your domain has proper SPF/DKIM/DMARC records configured.");
+            } else {
+                println!("WARNING: MAIL_SENDTYPE set to 'direct' but direct SMTP not configured.");
+                println!("         Set SMTP_FROM to enable direct SMTP sending.");
+            }
+        }
+        Some(other) => {
+            println!("WARNING: Invalid MAIL_SENDTYPE value '{}'. Use 'client' or 'direct'.", other);
+            if !smtp_client_configured && !smtp_direct_configured {
+                println!("         Email notifications disabled (no email method configured).");
+            }
+        }
+        None => {
+            // No MAIL_SENDTYPE set, auto-detect
+            if smtp_client_configured {
+                println!("INFO: Email notifications enabled via SMTP client (auto-detected)");
+            } else if smtp_direct_configured {
+                println!("INFO: Email notifications enabled via direct SMTP (auto-detected)");
+                println!("      Make sure your domain has proper SPF/DKIM/DMARC records configured.");
+            } else {
+                println!("WARNING: Email notifications disabled (no email method configured).");
+                println!("         Set SMTP_SERVER, SMTP_USERNAME, SMTP_PASSWORD, and SMTP_FROM for SMTP client,");
+                println!("         or set SMTP_FROM for direct SMTP, or use MAIL_SENDTYPE to specify a method.");
+            }
+        }
     }
 
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(pool.clone()))
+            .service(serve_service_worker)
             .service(serve_static)
             .service(auth::subroutes())
             .service(guest::subroutes())
+            .service(notification::subroutes())
             .service(party::subroutes())
             .service(party::home)
             .service(party::dashboard)

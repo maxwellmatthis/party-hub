@@ -144,6 +144,14 @@ impl Author {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WebPushSubscription {
+    pub id: String,
+    pub endpoint: String,
+    pub p256dh: String,
+    pub auth: String,
+}
+
 pub fn prepare_db() -> Result<()> {
     let conn = Connection::open("./party.db")?;
 
@@ -195,6 +203,29 @@ pub fn prepare_db() -> Result<()> {
             id    TEXT PRIMARY KEY,
             name  TEXT NOT NULL,
             author_secret TEXT NOT NULL
+        )",
+        (),
+    )?;
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS web_push_subscriptions (
+            id        TEXT PRIMARY KEY,
+            endpoint  TEXT NOT NULL UNIQUE,
+            p256dh    TEXT NOT NULL,
+            auth      TEXT NOT NULL,
+            created_at INTEGER DEFAULT (strftime('%s', 'now'))
+        )",
+        (),
+    )?;
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS guest_subscriptions (
+            guest_id        TEXT NOT NULL,
+            subscription_id TEXT NOT NULL,
+            created_at      INTEGER DEFAULT (strftime('%s', 'now')),
+            PRIMARY KEY (guest_id, subscription_id),
+            FOREIGN KEY (guest_id) REFERENCES guests(id),
+            FOREIGN KEY (subscription_id) REFERENCES web_push_subscriptions(id)
         )",
         (),
     )?;

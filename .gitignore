@@ -4,3 +4,4 @@
 # production data
 /*.db
 /*.yaml
+/*.pem

@@ -279,6 +279,7 @@ struct SavePartyForm {
     frozen: Option<bool>,
     public: Option<bool>,
     max_guests: Option<i64>,
+    changelog: Option<String>,
 }
 
 #[post("/{party_id}/update")]
@@ -339,6 +340,58 @@ async fn update_party(
                 match result {
                     Ok(rows_affected) => {
                         if rows_affected > 0 {
+                            // If changelog is provided, send notifications to all guests
+                            if let Some(changelog) = &form.changelog {
+                                let changelog_trimmed = changelog.trim();
+                                if !changelog_trimmed.is_empty() {
+                                    // Truncate to 2000 characters if needed
+                                    let changelog_limited = if changelog_trimmed.len() > 2000 {
+                                        &changelog_trimmed[..2000]
+                                    } else {
+                                        changelog_trimmed
+                                    };
+
+                                    // Get all guest IDs and invitation IDs for this party
+                                    let guest_invitation_map: std::collections::HashMap<String, String> = conn
+                                        .prepare("SELECT guest_id, id FROM invitations WHERE party_id = ?1")
+                                        .and_then(|mut stmt| {
+                                            let map = stmt.query_map([&party_id], |row| {
+                                                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                                            })?
+                                            .filter_map(|r| r.ok())
+                                            .collect();
+                                            Ok(map)
+                                        })
+                                        .unwrap_or_default();
+
+                                    // Send push notifications
+                                    if !guest_invitation_map.is_empty() {
+                                        let notification_content = format!("Update regarding {}: {}", form.name, changelog_limited);
+                                        let guest_ids: Vec<String> = guest_invitation_map.keys().cloned().collect();
+                                        
+                                        // Send push notifications
+                                        let _ = crate::notification::send_push(
+                                            pool.clone(),
+                                            notification_content.clone(),
+                                            guest_invitation_map,
+                                        ).await;
+                                        
+                                        // Send emails
+                                        let email_subject = format!("Party Update: {}", form.name);
+                                        let email_body = format!("{}\n\nView your invitation at: {}/{{invitation_id}}", 
+                                            changelog_limited,
+                                            std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string())
+                                        );
+                                        let _ = crate::notification::send_emails(
+                                            pool.clone(),
+                                            email_subject,
+                                            email_body,
+                                            guest_ids,
+                                        ).await;
+                                    }
+                                }
+                            }
+
                             HttpResponse::Ok().json(json!({
                                 "status": "success",
                                 "message": "Party updated successfully"
@@ -495,7 +548,41 @@ async fn add_guest_to_party(
                                     .and_then(|mut stmt| stmt.execute([&invitation_id, &guest_id, &party_id]));
 
                                 match result {
-                                    Ok(_) => HttpResponse::Ok().json(json!({"status": "success", "message": "Guest added to party"})),
+                                    Ok(_) => {
+                                        // Get party name for notification
+                                        let party_name: String = conn
+                                            .prepare("SELECT name FROM parties WHERE id = ?1")
+                                            .and_then(|mut stmt| stmt.query_row([&party_id], |row| row.get(0)))
+                                            .unwrap_or_else(|_| "a party".to_string());
+
+                                        // Send push notification to the guest
+                                        let mut guest_invitation_map = std::collections::HashMap::new();
+                                        guest_invitation_map.insert(guest_id.clone(), invitation_id.clone());
+                                        
+                                        let notification_content = format!("You've been invited to {}!", party_name);
+                                        let _ = crate::notification::send_push(
+                                            pool.clone(),
+                                            notification_content.clone(),
+                                            guest_invitation_map,
+                                        ).await;
+
+                                        // Send email notification
+                                        let email_subject = format!("You've been invited to {}", party_name);
+                                        let email_body = format!(
+                                            "You've been invited to {}!\n\nView your invitation at: {}/{}", 
+                                            party_name,
+                                            std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string()),
+                                            invitation_id
+                                        );
+                                        let _ = crate::notification::send_emails(
+                                            pool.clone(),
+                                            email_subject,
+                                            email_body,
+                                            vec![guest_id.clone()],
+                                        ).await;
+
+                                        HttpResponse::Ok().json(json!({"status": "success", "message": "Guest added to party"}))
+                                    },
                                     Err(_) => HttpResponse::InternalServerError().json(json!({"error": "Failed to add guest to party"}))
                                 }
                             }

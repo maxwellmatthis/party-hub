@@ -420,6 +420,7 @@ async fn details(
         "invitation_blocks": serde_json::from_str::<serde_json::Value>(&invitation_blocks).unwrap_or(json!([])),
         "invitation_block_answers": invitation.get_answers_json(),
         "other_guests_answers": filtered_other_answers,
+        "guest_id": invitation.guest_id,
         "guest_name": guest_name,
         "guest_salutation": guest_salutation,
         "guest_first": guest_first,

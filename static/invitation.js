@@ -892,6 +892,21 @@ class InvitationController {
                     window.location.href = '/register';
                 } else {
                     this.view.showSaveStatus('success');
+                    
+                    // Associate guest with device subscription
+                    const invitationData = this.model.getInvitationData();
+                    const guestId = invitationData?.guest_id;
+                    
+                    if (guestId) {
+                        // Import and call associateGuestWithDevice function
+                        import('/static/web-push.js').then(async (webPush) => {
+                            try {
+                                await webPush.associateGuestWithDevice(guestId);
+                            } catch (error) {
+                                console.log('Push notification association skipped or failed:', error);
+                            }
+                        });
+                    }
                 }
             } else {
                 throw new Error(result.error || 'Save failed');

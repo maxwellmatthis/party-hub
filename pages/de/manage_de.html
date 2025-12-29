@@ -74,6 +74,16 @@
             </div>
             <span><b>Tipp:</b> Nutze {{salutation}}, {{first}}, {{last}}, {{date}} oder {{time}} um die Einladung zu personalisieren.</span>
         </section>
+        <section>
+            <h3>Änderungsprotokoll</h3>
+            <p style="margin: 0 0 10px 0; color: #666; font-size: 0.95em;">
+                <b>Hinweis:</b> Wenn du hier etwas schreibst, werden alle Gäste sofort über die Änderungen per Push-Benachrichtigung und E-Mail informiert. Leer lassen, um still zu aktualisieren.
+            </p>
+            <textarea id="party-changelog-input" rows="3" maxlength="2000" placeholder="Beschreibe was sich geändert hat (optional)..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: inherit; resize: vertical;"></textarea>
+            <div style="text-align: right; font-size: 0.85em; color: #999; margin-top: 4px;">
+                <span id="changelog-char-count">0</span> / 2000 Zeichen
+            </div>
+        </section>
         <section class="action-buttons">
             <button id="save-party-btn">Speichern</button>
             <button id="delete-party-btn">Löschen</button> <!-- Red save button -->
@@ -277,7 +287,7 @@
         <!-- Either template#edit-party or template#edit-guest -->
     </main>
     <footer>
-        <p>Party Hub &middot; &copy; Maxwell Matthis 2025 &middot; <a
+        <p><a href="/">Party Hub</a> &middot; &copy; Maxwell Matthis 2025 &middot; <a
                 href="https://github.com/maxwellmatthis/party-hub">GitHub & Lizenzen</a></p>
     </footer>
 </body>
