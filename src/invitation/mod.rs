@@ -18,7 +18,7 @@ fn format_date_time(date_str: &str, language: &str) -> (String, String) {
     if let Ok(datetime) = chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S") {
         let formatted_date = match language {
             "de" => datetime.format("%d.%m.%Y").to_string(), // DD.MM.YYYY
-            _ => datetime.format("%m/%d/%Y").to_string(),     // MM/DD/YYYY (English)
+            _ => datetime.format("%m/%d/%Y").to_string(),    // MM/DD/YYYY (English)
         };
         let formatted_time = match language {
             "de" => datetime.format("%H:%M").to_string(), // 24-hour
@@ -58,19 +58,45 @@ pub async fn invitation_page(
     req: actix_web::HttpRequest,
     db: web::Data<Pool<SqliteConnectionManager>>,
 ) -> impl Responder {
-    let invitation_id = path.into_inner();
+    let id = path.into_inner();
 
-    // Verify this is actually a valid invitation ID before serving the page
+    // Verify this is actually a valid invitation ID or public party ID
     let conn = match db.get() {
         Ok(conn) => conn,
         Err(_) => return HttpResponse::InternalServerError().body("Database connection failed"),
     };
 
+    // First check if it's a public party ID
+    let is_public_party = conn
+        .prepare("SELECT public FROM parties WHERE id = ?1")
+        .and_then(|mut stmt| {
+            stmt.query_row([&id], |row| {
+                let is_public: bool = row.get(0)?;
+                Ok(is_public)
+            })
+        })
+        .unwrap_or(false);
+
+    if is_public_party {
+        // This is a public party - serve the invitation page for anonymous viewing
+        let language = detect_language(&req);
+        let filename = match language.as_str() {
+            "de" => "pages/de/invitation_de.html",
+            _ => "pages/en/invitation_en.html",
+        };
+
+        let html_content = fs::read_to_string(filename)
+            .unwrap_or_else(|_| "<h1>404: File Not Found</h1>".to_string());
+        return HttpResponse::Ok()
+            .content_type("text/html")
+            .body(html_content);
+    }
+
     // Check if invitation exists
     let invitation_exists = conn
         .prepare("SELECT COUNT(*) FROM invitations WHERE id = ?1")
         .and_then(|mut stmt| {
-            stmt.query_row([&invitation_id], |row| {
+            stmt.query_row([&id], |row| {
                 let count: i32 = row.get(0)?;
                 Ok(count > 0)
             })
@@ -78,7 +104,16 @@ pub async fn invitation_page(
         .unwrap_or(false);
 
     if !invitation_exists {
-        return HttpResponse::NotFound().body("Invitation not found");
+        let language = detect_language(&req);
+        let filename = match language.as_str() {
+            "de" => "pages/de/not_found_de.html",
+            _ => "pages/en/not_found_en.html",
+        };
+        let html_content =
+            fs::read_to_string(filename).unwrap_or_else(|_| "<h1>404: Not Found</h1>".to_string());
+        return HttpResponse::NotFound()
+            .content_type("text/html")
+            .body(html_content);
     }
 
     // Detect language from Accept-Language header
@@ -102,17 +137,55 @@ async fn details(
     req: actix_web::HttpRequest,
     db: web::Data<Pool<SqliteConnectionManager>>,
 ) -> impl Responder {
-    let invitation_id = path.into_inner();
+    let id = path.into_inner();
 
     let conn = match db.get() {
         Ok(conn) => conn,
         Err(_) => return HttpResponse::InternalServerError().body("Database connection failed"),
     };
 
+    // Check if this is a public party first
+    let public_party_check = conn
+        .prepare("SELECT id, invitation_blocks, date FROM parties WHERE id = ?1 AND public = 1")
+        .and_then(|mut stmt| {
+            stmt.query_row([&id], |row| {
+                let party_id: String = row.get(0)?;
+                let invitation_blocks: String = row.get(1)?;
+                let date: String = row.get(2)?;
+                Ok((party_id, invitation_blocks, date))
+            })
+        });
+
+    if let Ok((party_id, invitation_blocks, party_date)) = public_party_check {
+        // This is a public party - return anonymous guest data
+        let language = detect_language(&req);
+        let (formatted_date, formatted_time) = format_date_time(&party_date, &language);
+
+        let response = json!({
+            "invitation_blocks": serde_json::from_str::<serde_json::Value>(&invitation_blocks).unwrap_or(json!([])),
+            "invitation_block_answers": json!({}),
+            "other_guests_answers": json!([]),
+            "guest_name": "Anonymous",
+            "guest_salutation": "",
+            "guest_first": "Anonymous",
+            "guest_last": "",
+            "party_date": formatted_date,
+            "party_time": formatted_time,
+            "is_organizer": false,
+            "is_public_view": true,
+            "party_id": party_id,
+        });
+
+        return HttpResponse::Ok()
+            .content_type("application/json")
+            .body(response.to_string());
+    }
+
+    // Not a public party, treat as regular invitation
     let invitation = match conn
         .prepare("SELECT id, guest_id, party_id, invitation_block_answers, organizer FROM invitations WHERE id = ?1")
         .and_then(|mut stmt| {
-            stmt.query_row([&invitation_id], Invitation::from_row)
+            stmt.query_row([&id], Invitation::from_row)
         }) {
         Ok(invitation) => invitation,
         Err(_) => return HttpResponse::BadRequest().body("Invitation not found"),
@@ -155,12 +228,11 @@ async fn details(
     let language = detect_language(&req);
     let (formatted_date, formatted_time) = format_date_time(&party_date, &language);
 
-
     // Get all other guests' answers for the same party (excluding current invitation)
     // Include guest names for organizer view
     let all_other_answers = match conn.prepare("SELECT i.invitation_block_answers, g.first, g.last FROM invitations i JOIN guests g ON i.guest_id = g.id WHERE i.party_id = ?1 AND i.id != ?2 AND i.invitation_block_answers != ''")
         .and_then(|mut stmt| {
-            let answer_iter = stmt.query_map([&invitation.party_id, &invitation_id], |row| {
+            let answer_iter = stmt.query_map([&invitation.party_id, &id], |row| {
                 let answers: String = row.get(0)?;
                 let first: String = row.get(1)?;
                 let last: String = row.get(2)?;
@@ -198,7 +270,7 @@ async fn details(
                         attendance_block_id = Some(block_id.to_string());
                     }
                 }
-                
+
                 if let Some(content) = block.get("content") {
                     // Try to parse content as JSON to check for public flag
                     if let Ok(content_obj) =
@@ -244,12 +316,14 @@ async fn details(
                     for (block_id, answer) in answers_obj {
                         // Create answer object with guest name
                         // Add (?) if not RSVP'd yes, but not for the attendance block itself
-                        let is_attendance_block = Some(block_id.as_str()) == attendance_block_id.as_deref();
-                        let display_name = if has_rsvped_yes || is_attendance_block || !has_rsvp_block {
-                            guest_name.clone()
-                        } else {
-                            format!("{} (?)", guest_name)
-                        };
+                        let is_attendance_block =
+                            Some(block_id.as_str()) == attendance_block_id.as_deref();
+                        let display_name =
+                            if has_rsvped_yes || is_attendance_block || !has_rsvp_block {
+                                guest_name.clone()
+                            } else {
+                                format!("{} (?)", guest_name)
+                            };
                         let answer_with_name = json!({
                             "answer": answer,
                             "guest_name": display_name
@@ -288,8 +362,9 @@ async fn details(
                         if public_block_ids.contains(block_id) {
                             // For the attendance block itself, always show all responses
                             // For other blocks, only show if guest RSVP'd yes
-                            let is_attendance_block = Some(block_id.as_str()) == attendance_block_id.as_deref();
-                            
+                            let is_attendance_block =
+                                Some(block_id.as_str()) == attendance_block_id.as_deref();
+
                             if is_attendance_block || !has_rsvp_block || has_rsvped_yes {
                                 // Create answer object with guest name for public answers
                                 let answer_with_name = json!({
@@ -301,7 +376,7 @@ async fn details(
                         }
                     }
                 }
-                
+
                 // Only include this guest if they have at least one visible answer
                 if filtered_guest.is_empty() {
                     None
@@ -323,6 +398,7 @@ async fn details(
         "party_date": formatted_date,
         "party_time": formatted_time,
         "is_organizer": invitation.organizer,
+        "is_public_view": false,
     });
 
     HttpResponse::Ok()
@@ -340,20 +416,42 @@ async fn save_answers(
     path: web::Path<String>,
     json: web::Json<SaveAnswersRequest>,
     db: web::Data<Pool<SqliteConnectionManager>>,
+    req: actix_web::HttpRequest,
 ) -> impl Responder {
-    let invitation_id = path.into_inner();
+    let id = path.into_inner();
     let answers = &json.answers;
+    let language = detect_language(&req);
 
     let conn = match db.get() {
         Ok(conn) => conn,
         Err(_) => return HttpResponse::InternalServerError().body("Database connection failed"),
     };
 
+
+    // Check if this is a public party
+    let public_party_check = conn
+        .prepare("SELECT id FROM parties WHERE id = ?1 AND public = 1")
+        .and_then(|mut stmt| {
+            stmt.query_row([&id], |row| {
+                let party_id: String = row.get(0)?;
+                Ok(party_id)
+            })
+        });
+
+    if public_party_check.is_ok() {
+        // This is a public party - user needs to create guest first
+        // Return special response indicating they need to register
+        return HttpResponse::Ok().json(json!({
+            "status": "registration_required",
+            "message": "Please complete registration"
+        }));
+    }
+
     // Get invitation and party information
     let party_id = match conn
         .prepare("SELECT party_id FROM invitations WHERE id = ?1")
         .and_then(|mut stmt| {
-            stmt.query_row([&invitation_id], |row| {
+            stmt.query_row([&id], |row| {
                 let party_id: String = row.get(0)?;
                 Ok(party_id)
             })
@@ -386,58 +484,80 @@ async fn save_answers(
 
     // Check if party is frozen
     if frozen {
+        let error_msg = match language.as_str() {
+            "de" => "Diese Party ist eingefroren und akzeptiert keine Antworten mehr",
+            _ => "This party is frozen and no longer accepting responses",
+        };
         return HttpResponse::Forbidden().json(json!({
-            "error": "This party is frozen and no longer accepting responses"
+            "error": error_msg
         }));
     }
 
     // Check if respond_until deadline has passed
     if !respond_until.is_empty() {
         let now = chrono::Local::now().naive_local();
-        
+
         // Try to parse as datetime first (with or without seconds)
-        let deadline_passed = if let Ok(deadline) = chrono::NaiveDateTime::parse_from_str(&respond_until, "%Y-%m-%dT%H:%M:%S") {
+        let deadline_passed = if let Ok(deadline) =
+            chrono::NaiveDateTime::parse_from_str(&respond_until, "%Y-%m-%dT%H:%M:%S")
+        {
             now > deadline
-        } else if let Ok(deadline) = chrono::NaiveDateTime::parse_from_str(&respond_until, "%Y-%m-%dT%H:%M") {
+        } else if let Ok(deadline) =
+            chrono::NaiveDateTime::parse_from_str(&respond_until, "%Y-%m-%dT%H:%M")
+        {
             now > deadline
-        } else if let Ok(deadline_date) = chrono::NaiveDate::parse_from_str(&respond_until, "%Y-%m-%d") {
+        } else if let Ok(deadline_date) =
+            chrono::NaiveDate::parse_from_str(&respond_until, "%Y-%m-%d")
+        {
             // If only date, consider deadline as end of day
-            let deadline = deadline_date.and_hms_opt(23, 59, 59).unwrap_or(deadline_date.and_hms_opt(0, 0, 0).unwrap());
+            let deadline = deadline_date
+                .and_hms_opt(23, 59, 59)
+                .unwrap_or(deadline_date.and_hms_opt(0, 0, 0).unwrap());
             now > deadline
         } else {
             false
         };
 
         if deadline_passed {
+            let error_msg = match language.as_str() {
+                "de" => "Die Frist zum Antworten auf diese Einladung ist abgelaufen",
+                _ => "The deadline for responding to this invitation has passed",
+            };
             return HttpResponse::Forbidden().json(json!({
-                "error": "The deadline for responding to this invitation has passed"
+                "error": error_msg
             }));
         }
     }
 
     // Get valid block IDs from the party's invitation blocks
-    let valid_block_ids = match conn
-        .prepare("SELECT invitation_blocks FROM parties WHERE id = ?1")
+    let (valid_block_ids, attendance_block_id, max_guests) = match conn
+        .prepare("SELECT invitation_blocks, max_guests FROM parties WHERE id = ?1")
         .and_then(|mut stmt| {
             stmt.query_row([&party_id], |row| {
                 let invitation_blocks: String = row.get(0)?;
-                Ok(invitation_blocks)
+                let max_guests: i64 = row.get(1)?;
+                Ok((invitation_blocks, max_guests))
             })
         }) {
-        Ok(invitation_blocks) => {
-            // Parse invitation blocks to extract valid block IDs
+        Ok((invitation_blocks, max_guests)) => {
+            // Parse invitation blocks to extract valid block IDs and attendance block ID
             let blocks_json =
                 serde_json::from_str::<serde_json::Value>(&invitation_blocks).unwrap_or(json!([]));
 
             let mut valid_ids = std::collections::HashSet::new();
+            let mut attendance_id: Option<String> = None;
             if let Some(blocks_array) = blocks_json.as_array() {
                 for block in blocks_array.iter() {
                     if let Some(block_id) = block.get("id").and_then(|v| v.as_str()) {
                         valid_ids.insert(block_id.to_string());
+                        // Check if this is an attendance block
+                        if block.get("template").and_then(|v| v.as_str()) == Some("attendance") {
+                            attendance_id = Some(block_id.to_string());
+                        }
                     }
                 }
             }
-            valid_ids
+            (valid_ids, attendance_id, max_guests)
         }
         Err(_) => {
             return HttpResponse::InternalServerError().json(json!({
@@ -445,6 +565,83 @@ async fn save_answers(
             }));
         }
     };
+
+    // Check if user is trying to RSVP "yes" (answer = 0) and max_guests limit is reached
+    // Note: "no" (2) and "maybe" (1) responses are always allowed to let people free up space
+    // Only enforce this if there's an attendance block AND max_guests is set
+    if max_guests > 0 && attendance_block_id.is_some() {
+        let attendance_id = attendance_block_id.as_ref().unwrap();
+        if let Some(new_answer) = answers.get(attendance_id) {
+            if new_answer.as_i64() == Some(0) {
+                // User is trying to RSVP yes - check if they currently have "yes"
+                // If they already have yes, allow them to keep it or update other answers
+                let current_attendance_answer = conn
+                    .prepare("SELECT invitation_block_answers FROM invitations WHERE id = ?1")
+                    .and_then(|mut stmt| {
+                        stmt.query_row([&id], |row| {
+                            let current_answers: String = row.get(0)?;
+                            Ok(current_answers)
+                        })
+                    })
+                    .ok()
+                    .and_then(|ans_str| {
+                        if ans_str.is_empty() {
+                            None
+                        } else {
+                            serde_json::from_str::<serde_json::Value>(&ans_str).ok()
+                        }
+                    })
+                    .and_then(|ans_json| ans_json.get(attendance_id).cloned())
+                    .and_then(|ans| ans.as_i64());
+
+                // Only check limit if they're NOT currently "yes" (changing from no/maybe/unanswered to yes)
+                let is_changing_to_yes = current_attendance_answer != Some(0);
+
+                if is_changing_to_yes {
+                    // Count current yes responses from OTHER invitations
+                    let yes_count = conn
+                        .prepare("SELECT invitation_block_answers FROM invitations WHERE party_id = ?1 AND id != ?2")
+                        .and_then(|mut stmt| {
+                            let answer_iter = stmt.query_map([&party_id, &id], |row| {
+                                let answers: String = row.get(0)?;
+                                Ok(answers)
+                            })?;
+
+                            let mut count = 0i64;
+                            for answer_result in answer_iter {
+                                if let Ok(answer_str) = answer_result {
+                                    // Skip empty answer strings
+                                    if answer_str.is_empty() {
+                                        continue;
+                                    }
+                                    if let Ok(answer_json) = serde_json::from_str::<serde_json::Value>(&answer_str) {
+                                        if let Some(att_answer) = answer_json.get(attendance_id) {
+                                            if let Some(answer_val) = att_answer.as_i64() {
+                                                if answer_val == 0 {
+                                                    count += 1;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Ok(count)
+                        })
+                        .unwrap_or(0);
+
+                    if yes_count >= max_guests {
+                        let error_msg = match language.as_str() {
+                            "de" => "Diese Party hat die maximale Anzahl an Gästen erreicht",
+                            _ => "This party has reached its maximum number of guests",
+                        };
+                        return HttpResponse::Forbidden().json(json!({
+                            "error": error_msg
+                        }));
+                    }
+                }
+            }
+        }
+    }
 
     // Filter answers to only include valid block IDs
     let filtered_answers = if let Some(answers_obj) = answers.as_object() {
@@ -465,7 +662,7 @@ async fn save_answers(
     // Update the invitation with filtered answers using prepared statement
     let update_result = conn
         .prepare("UPDATE invitations SET invitation_block_answers = ?1 WHERE id = ?2")
-        .and_then(|mut stmt| stmt.execute([&answers_json, &invitation_id]));
+        .and_then(|mut stmt| stmt.execute([&answers_json, &id]));
 
     match update_result {
         Ok(_) => HttpResponse::Ok().json(json!({
@@ -479,6 +676,21 @@ async fn save_answers(
             }))
         }
     }
+}
+
+#[get("/register")]
+pub async fn register(req: actix_web::HttpRequest) -> impl Responder {
+    let language = detect_language(&req);
+    let filename = match language.as_str() {
+        "de" => "pages/de/public_guest_de.html",
+        _ => "pages/en/public_guest_en.html",
+    };
+
+    let html_content =
+        fs::read_to_string(filename).unwrap_or_else(|_| "<h1>404: File Not Found</h1>".to_string());
+    HttpResponse::Ok()
+        .content_type("text/html")
+        .body(html_content)
 }
 
 pub fn subroutes() -> Scope {

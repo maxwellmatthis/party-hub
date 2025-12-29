@@ -92,6 +92,7 @@ pub struct Guest {
     pub email: String,
     pub note: String,
     pub author: String,
+    pub selfcreated: bool,
 }
 
 impl Guest {
@@ -104,6 +105,7 @@ impl Guest {
             email: row.get("email")?,
             note: row.get("note")?,
             author: row.get("author")?,
+            selfcreated: row.get("selfcreated")?,
         })
     }
 
@@ -115,7 +117,8 @@ impl Guest {
             "first": self.first,
             "last": self.last,
             "email": self.email,
-            "note": self.note
+            "note": self.note,
+            "selfcreated": self.selfcreated
         })
     }
 }
@@ -175,7 +178,8 @@ pub fn prepare_db() -> Result<()> {
             last TEXT NOT NULL DEFAULT '',
             email TEXT NOT NULL DEFAULT '',
             note TEXT NOT NULL DEFAULT '',
-            author TEXT NOT NULL
+            author TEXT NOT NULL,
+            selfcreated BOOLEAN NOT NULL DEFAULT FALSE
         )",
         (),
     )?;

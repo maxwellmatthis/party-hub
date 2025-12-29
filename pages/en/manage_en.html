@@ -31,6 +31,10 @@
                 <input type="datetime-local" id="party-respond-until-input">
             </div>
             <div>
+                <label for="party-max-guests-input">Max Guests (0 = unlimited)</label>
+                <input type="number" id="party-max-guests-input" min="0">
+            </div>
+            <div>
                 <label>
                     <input type="checkbox" id="party-frozen-input">
                     Frozen (no more responses)
@@ -42,9 +46,11 @@
                     Public (anyone with the party ID can sign up)
                 </label>
             </div>
-            <div id="max-guests-container" style="display: none; margin-left: 30px;">
-                <label for="party-max-guests-input">Max Guests (0 = unlimited)</label>
-                <input type="number" id="party-max-guests-input" min="0">
+            <div id="public-link-container" style="display: none; margin-left: 30px;">
+                <button id="copy-public-link-btn" class="btn" style="margin-top: 10px;">
+                    <img src="/static/clipboard.svg" alt="Copy Public Link">
+                    Copy Public Link
+                </button>
             </div>
         </section>
         <section>
@@ -146,7 +152,10 @@
     </template>
     <template id="edit-guest">
         <section>
-            <h3>Guest Details</h3>
+            <h3>
+                Guest Details
+                <span id="guest-selfcreated-badge" style="display: none; margin-left: 10px; padding: 4px 8px; background-color: #4CAF50; color: white; border-radius: 4px; font-size: 0.75em; font-weight: normal;">Self-Registered</span>
+            </h3>
             <div>
                 <label for="guest-edit-salutation">Salutation</label>
                 <input id="guest-edit-salutation" type="text" placeholder="Mr., Ms., Dr., etc.">

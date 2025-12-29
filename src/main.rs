@@ -27,9 +27,12 @@ async fn serve_static(path: web::Path<String>) -> impl Responder {
         "manage.js",
         "menu.svg",
         "plus.svg",
+        "style.css",
         "trash-2.svg",
+        "whyemptycat.png",
         "favicon.ico",
         "x.svg",
+        "public_guest.js",
     ];
 
     // Check if the requested file is in the whitelist
@@ -107,6 +110,7 @@ async fn main() -> std::io::Result<()> {
             .service(party::subroutes())
             .service(party::manage)
             .service(invitation::subroutes())
+            .service(invitation::register)
             .service(invitation::invitation_page)
     })
     .bind(("127.0.0.1", port))?

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Registration</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <main>
+        <h1>Complete Your Registration</h1>
+        <p>Please provide your information to complete your RSVP:</p>
+        
+        <form id="registration-form">
+            <div class="form-group">
+                <label for="salutation">Salutation</label>
+                <input type="text" id="salutation" name="salutation" placeholder="Mr., Mrs., Ms., Dr., etc.">
+            </div>
+            
+            <div class="form-group">
+                <label for="first">First Name *</label>
+                <input type="text" id="first" name="first" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="last">Last Name</label>
+                <input type="text" id="last" name="last">
+            </div>
+            
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email">
+            </div>
+            
+            <button type="submit" id="create-btn">Create</button>
+        </form>
+        
+        <div id="error-message" style="display: none; color: red; margin-top: 20px;"></div>
+    </main>
+    
+    <script src="/static/public_guest.js"></script>
+</body>
+</html>

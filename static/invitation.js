@@ -787,6 +787,20 @@ class InvitationController {
             return;
         }
 
+        // Check if this is a public party view
+        const invitationData = this.model.getInvitationData();
+        if (invitationData && invitationData.is_public_view) {
+            // Store answers in localStorage and redirect to registration page
+            localStorage.setItem('public_party_answers', JSON.stringify({
+                partyId: invitationData.party_id,
+                answers: this.model.getAllAnswers()
+            }));
+            
+            // Redirect to registration page
+            window.location.href = '/register';
+            return;
+        }
+
         try {
             this.view.showSaveStatus('saving');
 
@@ -801,7 +815,16 @@ class InvitationController {
             const result = await response.json();
 
             if (response.ok) {
-                this.view.showSaveStatus('success');
+                if (result.status === 'registration_required') {
+                    // Shouldn't happen, but handle it anyway
+                    localStorage.setItem('public_party_answers', JSON.stringify({
+                        partyId: invitationId,
+                        answers: this.model.getAllAnswers()
+                    }));
+                    window.location.href = '/register';
+                } else {
+                    this.view.showSaveStatus('success');
+                }
             } else {
                 throw new Error(result.error || 'Save failed');
             }

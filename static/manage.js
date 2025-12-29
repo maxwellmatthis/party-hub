@@ -351,7 +351,7 @@ async function renderParty(partyId) {
         const dateInput = p.querySelector("input#party-date-input");
         const respondUntilInput = p.querySelector("input#party-respond-until-input");
         const maxGuestsInput = p.querySelector("input#party-max-guests-input");
-        const maxGuestsContainer = p.querySelector("#max-guests-container");
+        const publicLinkContainer = p.querySelector("#public-link-container");
         const frozenInput = p.querySelector("input#party-frozen-input");
         const publicInput = p.querySelector("input#party-public-input");
 
@@ -362,14 +362,42 @@ async function renderParty(partyId) {
         frozenInput.checked = partyDetails.frozen || false;
         publicInput.checked = partyDetails.public || false;
 
-        // Show/hide max guests based on public checkbox
-        const toggleMaxGuests = () => {
-            if (maxGuestsContainer) {
-                maxGuestsContainer.style.display = publicInput.checked ? 'block' : 'none';
+        // Show/hide public link button based on public checkbox
+        const togglePublicLink = () => {
+            if (publicLinkContainer) {
+                publicLinkContainer.style.display = publicInput.checked ? 'block' : 'none';
             }
         };
-        toggleMaxGuests();
-        publicInput.addEventListener('change', toggleMaxGuests);
+        togglePublicLink();
+        publicInput.addEventListener('change', togglePublicLink);
+
+        // Copy public link button handler
+        const copyPublicLinkBtn = p.querySelector("#copy-public-link-btn");
+        if (copyPublicLinkBtn) {
+            copyPublicLinkBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const publicUrl = `${window.location.origin}/${partyId}`;
+                
+                try {
+                    await navigator.clipboard.writeText(publicUrl);
+                    showToast('Public link copied to clipboard!', 'success');
+                } catch (err) {
+                    console.error('Failed to copy to clipboard:', err);
+                    const textArea = document.createElement('textarea');
+                    textArea.value = publicUrl;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    try {
+                        document.execCommand('copy');
+                        showToast('Public link copied to clipboard!', 'success');
+                    } catch (fallbackErr) {
+                        console.error('Fallback copy failed:', fallbackErr);
+                        showToast('Failed to copy public link', 'error');
+                    }
+                    document.body.removeChild(textArea);
+                }
+            });
+        }
 
         p.querySelector("#save-party-btn").addEventListener('click', () => saveParty(partyId));
         p.querySelector("#delete-party-btn").addEventListener('click', () => deleteParty(partyId));
@@ -381,7 +409,16 @@ async function renderParty(partyId) {
             const guestElement = templateGuest.content.cloneNode(true);
             const guestDiv = guestElement.querySelector(".guest-item");
 
-            guestElement.querySelector("span#guest-name").textContent = `${guest.first} ${guest.last}`.trim() || 'Unnamed Guest';
+            const guestNameElement = guestElement.querySelector("span#guest-name");
+            guestNameElement.textContent = `${guest.first} ${guest.last}`.trim() || 'Unnamed Guest';
+            
+            // Add selfcreated badge if applicable
+            if (guest.selfcreated) {
+                const badge = document.createElement('span');
+                badge.style.cssText = 'margin-left: 8px; padding: 2px 6px; background-color: #4CAF50; color: white; border-radius: 3px; font-size: 0.7em; font-weight: normal;';
+                badge.textContent = '✓ Self';
+                guestNameElement.appendChild(badge);
+            }
 
             const organizerButton = guestElement.querySelector("button#guest-organizer");
             const chevronUp = organizerButton.querySelector('#guest-promote');
@@ -806,6 +843,12 @@ async function renderGuest(guestId) {
         lastInput.value = guestDetails.last || '';
         emailInput.value = guestDetails.email || '';
         noteTextarea.value = guestDetails.note || '';
+
+        // Show selfcreated badge if applicable
+        if (guestDetails.selfcreated) {
+            const badge = g.querySelector("#guest-selfcreated-badge");
+            if (badge) badge.style.display = "inline-block";
+        }
 
         g.querySelector("#save-guest-btn").addEventListener('click', () => saveGuest(guestId));
         g.querySelector("#delete-guest-btn").addEventListener('click', () => deleteGuest(guestId));

@@ -16,7 +16,12 @@ A modern, minimalistic party invitation platform built with Rust (Actix Web), SQ
   - **Number Input**: Numeric responses
   - **Single Choice**: Radio button selections with live vote counts
   - **Multiple Choice**: Checkbox selections with live vote counts
+  - **Attendance Block**: Dedicated RSVP functionality with customizable options
 - 👥 **Guest Management**: Easy guest creation, invitation system, and organizer privileges
+- 🔗 **Public Party Links**: Share a single link that allows anyone to self-register and create their own invitation
+  - Copy public party link with one click
+  - Self-registered guests are marked with a badge
+  - Optional guest limit enforcement
 - 📊 **Real-time Statistics**: Public questions show live vote counts and guest names as responses come in
 - 🔒 **Privacy Controls**: Questions can be marked as public (visible to all) or private (organizer-only)
 - 📱 **Responsive Design**: Modern, clean UI that works on all devices
