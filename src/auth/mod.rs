@@ -67,7 +67,7 @@ async fn auth_post(
                 .finish();
 
             HttpResponse::Found()
-                .append_header(("Location", "/"))
+                .append_header(("Location", "/dashboard"))
                 .cookie(cookie)
                 .finish()
         }

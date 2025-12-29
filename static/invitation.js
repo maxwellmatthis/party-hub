@@ -1,5 +1,38 @@
 // MVC Architecture for Party Invitation Form
 
+// Helper function to save invitation to localStorage
+function saveInvitationToLocalStorage(invitationId, data) {
+    try {
+        // Get existing invitations
+        const invitations = JSON.parse(localStorage.getItem('party_hub_invitations') || '[]');
+
+        // Create invitation entry
+        const invitationEntry = {
+            invitationId: invitationId,
+            name: data.party_name || 'Unnamed Party',
+            date: data.party_date || '',
+            author: data.author_name || 'Unknown',
+            invitee: data.guest_name || 'Unknown'
+        };
+
+        // Check if invitation already exists
+        const existingIndex = invitations.findIndex(inv => inv.invitationId === invitationId);
+
+        if (existingIndex >= 0) {
+            // Update existing invitation
+            invitations[existingIndex] = invitationEntry;
+        } else {
+            // Add new invitation
+            invitations.push(invitationEntry);
+        }
+
+        // Save back to localStorage
+        localStorage.setItem('party_hub_invitations', JSON.stringify(invitations));
+    } catch (error) {
+        console.error('Error saving invitation to localStorage:', error);
+    }
+}
+
 // ===== MODEL =====
 class InvitationModel {
     constructor() {
@@ -677,17 +710,17 @@ class InvitationView {
     createCalendar() {
         const cal = this.templates.calendar.content.cloneNode(true);
         const downloadBtn = cal.querySelector('.download-calendar-btn');
-        
+
         downloadBtn.addEventListener('click', async () => {
             // Get the invitation ID from the URL
             const url = new URL(window.location.href);
             const invitationId = url.pathname.split('/').pop();
-            
+
             if (!invitationId) {
                 console.error('No invitation ID found');
                 return;
             }
-            
+
             try {
                 // Open the .ics file in a new window/tab, allowing the browser/OS to handle it
                 // This typically prompts the user to add it to their calendar app
@@ -697,7 +730,7 @@ class InvitationView {
                 alert('Failed to open calendar file. Please try again.');
             }
         });
-        
+
         return cal;
     }
 
@@ -802,7 +835,12 @@ class InvitationController {
             try {
                 const response = await fetch(`/invitation/${invitationId}`);
                 if (!response.ok) throw new Error('Network response was not ok');
-                return await response.json();
+                const data = await response.json();
+
+                // Save invitation to localStorage
+                saveInvitationToLocalStorage(invitationId, data);
+
+                return data;
             } catch (_error) { }
         }
         return { invitation_blocks: [], invitation_block_answers: {}, other_guests_answers: [] };
@@ -825,7 +863,7 @@ class InvitationController {
                 partyId: invitationData.party_id,
                 answers: this.model.getAllAnswers()
             }));
-            
+
             // Redirect to registration page
             window.location.href = '/register';
             return;

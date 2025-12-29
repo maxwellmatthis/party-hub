@@ -22,6 +22,8 @@ async fn serve_static(path: web::Path<String>) -> impl Responder {
         "chevron-down.svg",
         "chevron-up.svg",
         "clipboard.svg",
+        "index.css",
+        "index.js",
         "invitation.css",
         "invitation.js",
         "manage.css",
@@ -100,7 +102,13 @@ async fn main() -> std::io::Result<()> {
         .parse::<u16>()
         .unwrap_or(8080);
 
-    println!("Starting Party Hub server on http://127.0.0.1:{}", port);
+    println!("INFO: Starting Party Hub server on http://127.0.0.1:{}", port);
+    match env::var("ENV") {
+        Ok(val) => {
+            println!("INFO: Running in {val} mode.")
+        },
+        Err(_e) => println!("WARNING: No ENV found in environment. Defaulting to production mode. FOR SECURITY REASONS COOKIES WILL NO WORK WITHOUT HTTPS.")
+    }
 
     HttpServer::new(move || {
         App::new()
@@ -109,7 +117,8 @@ async fn main() -> std::io::Result<()> {
             .service(auth::subroutes())
             .service(guest::subroutes())
             .service(party::subroutes())
-            .service(party::manage)
+            .service(party::home)
+            .service(party::dashboard)
             .service(invitation::subroutes())
             .service(invitation::register)
             .service(invitation::invitation_page)

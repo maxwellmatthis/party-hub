@@ -10,7 +10,26 @@ use std::fs;
 use uuid::Uuid;
 
 #[get("/")]
-pub async fn manage(
+pub async fn home(
+    req: actix_web::HttpRequest,
+) -> impl Responder {
+    // Detect language from Accept-Language header
+    let language = detect_language(&req);
+
+    let filename = match language.as_str() {
+        "de" => "pages/de/index_de.html",
+        _ => "pages/en/index_en.html", // Default to English
+    };
+
+    let html_content =
+        fs::read_to_string(filename).unwrap_or_else(|_| "<h1>404: File Not Found</h1>".to_string());
+    HttpResponse::Ok()
+        .content_type("text/html")
+        .body(html_content)
+}
+
+#[get("/dashboard")]
+pub async fn dashboard(
     req: actix_web::HttpRequest,
     db: web::Data<Pool<SqliteConnectionManager>>,
 ) -> impl Responder {

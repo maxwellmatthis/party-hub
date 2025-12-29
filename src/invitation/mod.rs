@@ -146,20 +146,34 @@ async fn details(
 
     // Check if this is a public party first
     let public_party_check = conn
-        .prepare("SELECT id, invitation_blocks, date FROM parties WHERE id = ?1 AND public = 1")
+        .prepare("SELECT id, invitation_blocks, date, name, author FROM parties WHERE id = ?1 AND public = 1")
         .and_then(|mut stmt| {
             stmt.query_row([&id], |row| {
                 let party_id: String = row.get(0)?;
                 let invitation_blocks: String = row.get(1)?;
                 let date: String = row.get(2)?;
-                Ok((party_id, invitation_blocks, date))
+                let party_name: String = row.get(3)?;
+                let author_id: String = row.get(4)?;
+                Ok((party_id, invitation_blocks, date, party_name, author_id))
             })
         });
 
-    if let Ok((party_id, invitation_blocks, party_date)) = public_party_check {
+    if let Ok((party_id, invitation_blocks, party_date, party_name, author_id)) = public_party_check
+    {
         // This is a public party - return anonymous guest data
         let language = detect_language(&req);
         let (formatted_date, formatted_time) = format_date_time(&party_date, &language);
+
+        // Get author name separately
+        let author_name = conn
+            .prepare("SELECT name FROM authors WHERE id = ?1")
+            .and_then(|mut stmt| {
+                stmt.query_row([&author_id], |row| {
+                    let name: String = row.get(0)?;
+                    Ok(name)
+                })
+            })
+            .unwrap_or_else(|_| "Unknown".to_string());
 
         let response = json!({
             "invitation_blocks": serde_json::from_str::<serde_json::Value>(&invitation_blocks).unwrap_or(json!([])),
@@ -169,8 +183,10 @@ async fn details(
             "guest_salutation": "",
             "guest_first": "Anonymous",
             "guest_last": "",
+            "party_name": party_name,
             "party_date": formatted_date,
             "party_time": formatted_time,
+            "author_name": author_name,
             "is_organizer": false,
             "is_public_view": true,
             "party_id": party_id,
@@ -209,20 +225,33 @@ async fn details(
     // Create full name for backward compatibility
     let guest_name = format!("{} {}", guest_first, guest_last).trim().to_string();
 
-    // Get invitation blocks, party date, and has_rsvp_block flag
-    let (invitation_blocks, party_date, has_rsvp_block) = match conn
-        .prepare("SELECT invitation_blocks, date, has_rsvp_block FROM parties WHERE id = ?1")
+    // Get invitation blocks, party date, party name, and has_rsvp_block flag
+    let (invitation_blocks, party_date, party_name, author_id, has_rsvp_block) = match conn
+        .prepare("SELECT invitation_blocks, date, name, author, has_rsvp_block FROM parties WHERE id = ?1")
         .and_then(|mut stmt| {
             stmt.query_row([&invitation.party_id], |row| {
                 let invitation_blocks: String = row.get(0)?;
                 let date: String = row.get(1)?;
-                let has_rsvp_block: bool = row.get(2)?;
-                Ok((invitation_blocks, date, has_rsvp_block))
+                let party_name: String = row.get(2)?;
+                let author_id: String = row.get(3)?;
+                let has_rsvp_block: bool = row.get(4)?;
+                Ok((invitation_blocks, date, party_name, author_id, has_rsvp_block))
             })
         }) {
         Ok(data) => data,
         Err(_) => return HttpResponse::InternalServerError().body("Party data not found"),
     };
+
+    // Get author name separately
+    let author_name = conn
+        .prepare("SELECT name FROM authors WHERE id = ?1")
+        .and_then(|mut stmt| {
+            stmt.query_row([&author_id], |row| {
+                let name: String = row.get(0)?;
+                Ok(name)
+            })
+        })
+        .unwrap_or_else(|_| "Unknown".to_string());
 
     // Format date and time based on language
     let language = detect_language(&req);
@@ -395,8 +424,10 @@ async fn details(
         "guest_salutation": guest_salutation,
         "guest_first": guest_first,
         "guest_last": guest_last,
+        "party_name": party_name,
         "party_date": formatted_date,
         "party_time": formatted_time,
+        "author_name": author_name,
         "is_organizer": invitation.organizer,
         "is_public_view": false,
     });
@@ -426,7 +457,6 @@ async fn save_answers(
         Ok(conn) => conn,
         Err(_) => return HttpResponse::InternalServerError().body("Database connection failed"),
     };
-
 
     // Check if this is a public party
     let public_party_check = conn
@@ -724,7 +754,9 @@ async fn download_calendar(
     let (party_name, party_date, duration_hours, location) = party_info;
 
     // Parse the party date
-    let start_dt = if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(&party_date, "%Y-%m-%dT%H:%M:%S") {
+    let start_dt = if let Ok(dt) =
+        chrono::NaiveDateTime::parse_from_str(&party_date, "%Y-%m-%dT%H:%M:%S")
+    {
         dt
     } else if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(&party_date, "%Y-%m-%dT%H:%M") {
         dt
@@ -765,7 +797,13 @@ async fn download_calendar(
 
     HttpResponse::Ok()
         .content_type("text/calendar; charset=utf-8")
-        .append_header(("Content-Disposition", format!("inline; filename=\"{}.ics\"", party_name.replace("/", "-").replace("\\", "-"))))
+        .append_header((
+            "Content-Disposition",
+            format!(
+                "inline; filename=\"{}.ics\"",
+                party_name.replace("/", "-").replace("\\", "-")
+            ),
+        ))
         .body(ics_content)
 }
 
