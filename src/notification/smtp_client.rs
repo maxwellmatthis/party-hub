@@ -1,6 +1,6 @@
 use actix_web::web;
-use lettre::{Message, SmtpTransport, Transport};
 use lettre::transport::smtp::authentication::Credentials;
+use lettre::{Message, SmtpTransport, Transport};
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use std::sync::OnceLock;
@@ -36,8 +36,7 @@ pub async fn send_emails_via_client(
     let smtp_password = std::env::var("SMTP_PASSWORD").unwrap();
     let smtp_from = std::env::var("SMTP_FROM").unwrap();
 
-    let conn = db.get()
-        .map_err(|_| "Database connection failed")?;
+    let conn = db.get().map_err(|_| "Database connection failed")?;
 
     // Get email addresses for all guests
     let placeholders = guest_ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
@@ -46,7 +45,8 @@ pub async fn send_emails_via_client(
         placeholders
     );
 
-    let mut stmt = conn.prepare(&query)
+    let mut stmt = conn
+        .prepare(&query)
         .map_err(|e| format!("Failed to prepare query: {}", e))?;
 
     let params: Vec<&dyn rusqlite::ToSql> = guest_ids
@@ -80,9 +80,13 @@ pub async fn send_emails_via_client(
     // Send email to each guest
     for (email, first, last) in guest_emails {
         let recipient_name = format!("{} {}", first, last).trim().to_string();
-        
+
         let message = Message::builder()
-            .from(smtp_from.parse().map_err(|e| format!("Invalid from address: {}", e))?)
+            .from(
+                smtp_from
+                    .parse()
+                    .map_err(|e| format!("Invalid from address: {}", e))?,
+            )
             .to(format!("{} <{}>", recipient_name, email)
                 .parse()
                 .map_err(|e| format!("Invalid to address: {}", e))?)
@@ -91,9 +95,7 @@ pub async fn send_emails_via_client(
             .map_err(|e| format!("Failed to build email: {}", e))?;
 
         match mailer.send(&message) {
-            Ok(_) => {
-                println!("[EMAIL] Sent successfully to: {}", email);
-            }
+            Ok(_) => {}
             Err(e) => {
                 eprintln!("[EMAIL ERROR] Failed to send email to {}: {}", email, e);
             }
