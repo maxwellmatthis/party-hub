@@ -367,27 +367,31 @@ async fn update_party(
                                     // Send push notifications
                                     if !guest_invitation_map.is_empty() {
                                         let notification_content = format!("Update regarding {}: {}", form.name, changelog_limited);
-                                        let guest_ids: Vec<String> = guest_invitation_map.keys().cloned().collect();
                                         
                                         // Send push notifications
                                         let _ = crate::notification::send_push(
                                             pool.clone(),
                                             notification_content.clone(),
-                                            guest_invitation_map,
+                                            guest_invitation_map.clone(),
                                         ).await;
                                         
-                                        // Send emails
+                                        // Send emails individually with correct invitation links
                                         let email_subject = format!("Party Update: {}", form.name);
-                                        let email_body = format!("{}\n\nView your invitation at: {}/{{invitation_id}}", 
-                                            changelog_limited,
-                                            std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string())
-                                        );
-                                        let _ = crate::notification::send_emails(
-                                            pool.clone(),
-                                            email_subject,
-                                            email_body,
-                                            guest_ids,
-                                        ).await;
+                                        let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
+                                        
+                                        for (guest_id, invitation_id) in guest_invitation_map {
+                                            let email_body = format!("{}\n\nView your invitation at: {}/{}", 
+                                                changelog_limited,
+                                                base_url,
+                                                invitation_id
+                                            );
+                                            let _ = crate::notification::send_emails(
+                                                pool.clone(),
+                                                email_subject.clone(),
+                                                email_body,
+                                                vec![guest_id],
+                                            ).await;
+                                        }
                                     }
                                 }
                             }

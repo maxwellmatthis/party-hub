@@ -54,8 +54,6 @@ async fn send_email_direct(
         return Err(format!("No MX records found for {}", to_domain));
     }
 
-    println!("[EMAIL] Found {} MX record(s) for {}", mx_records.len(), to_domain);
-
     // Generate a unique Message-ID
     let from_domain = from_addr.split('@').nth(1)
         .and_then(|s| s.split('>').next())
@@ -80,11 +78,18 @@ async fn send_email_direct(
 
     // Try each MX server in order of priority
     for (priority, mx_host) in mx_records {
-        println!("[EMAIL] Attempting to send via {} (priority {})", mx_host, priority);
-
-        // Create TLS parameters with the MX hostname
-        let tls = TlsParameters::new(mx_host.clone())
-            .map_err(|e| format!("Failed to create TLS parameters: {}", e))?;
+        // For direct MX connections, we need to be more lenient with TLS
+        // Many MX servers have certificates that don't exactly match their hostname
+        let tls = match TlsParameters::builder(mx_host.clone())
+            .dangerous_accept_invalid_hostnames(true)
+            .build()
+        {
+            Ok(params) => params,
+            Err(e) => {
+                eprintln!("[EMAIL] Failed to create TLS parameters for {}: {}", mx_host, e);
+                continue;
+            }
+        };
 
         // Try to connect and send
         let mailer = match SmtpTransport::relay(&mx_host) {
@@ -100,7 +105,6 @@ async fn send_email_direct(
 
         match mailer.send(&message) {
             Ok(_) => {
-                println!("[EMAIL] Successfully sent to {} via {}", to_email, mx_host);
                 return Ok(());
             }
             Err(e) => {
@@ -126,7 +130,6 @@ pub async fn send_emails_direct(
     let smtp_from = match std::env::var("SMTP_FROM") {
         Ok(addr) => addr,
         Err(_) => {
-            println!("[EMAIL] SMTP_FROM not configured, skipping direct email sending");
             return Ok(());
         }
     };
@@ -172,7 +175,6 @@ pub async fn send_emails_direct(
 
         match send_email_direct(&smtp_from, &to_addr, &email, &subject, &body).await {
             Ok(_) => {
-                println!("[EMAIL] Successfully sent to {}", email);
             }
             Err(e) => {
                 eprintln!("[EMAIL ERROR] Failed to send to {}: {}", email, e);

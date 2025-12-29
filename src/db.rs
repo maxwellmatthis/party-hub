@@ -2,12 +2,6 @@ use rusqlite::{Connection, Result, Row};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct InvitationBlock {
-    pub template: String,
-    pub content: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct Party {
     pub id: String,
     pub name: String,
@@ -142,14 +136,6 @@ impl Author {
             author_secret: row.get("author_secret")?,
         })
     }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct WebPushSubscription {
-    pub id: String,
-    pub endpoint: String,
-    pub p256dh: String,
-    pub auth: String,
 }
 
 pub fn prepare_db() -> Result<()> {

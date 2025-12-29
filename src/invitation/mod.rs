@@ -781,7 +781,8 @@ async fn download_calendar(
     let dtstamp = now.format("%Y%m%dT%H%M%SZ").to_string();
 
     // Build invitation URL
-    let invitation_url = format!("https://party-hub.com/{}", invitation_id); // TODO: Use actual host
+    let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
+    let invitation_url = format!("{}/{}", base_url, invitation_id);
 
     // Generate iCalendar file
     let ics_content = format!(
