@@ -138,6 +138,7 @@ function updateBlockVisibility(blockDiv, blockType) {
     const optionsInput = blockDiv.querySelector('input[type="text"]');
     const attendanceOptionsDiv = blockDiv.querySelector('.attendance-options');
     const visibilitySelect = blockDiv.querySelector('select[name="visibility"]');
+    const contentTextarea = blockDiv.querySelector('textarea');
 
     // Show attendance options only for attendance type
     if (attendanceOptionsDiv) {
@@ -150,6 +151,11 @@ function updateBlockVisibility(blockDiv, blockType) {
 
     const isQuestion = ['single_choice', 'multiple_choice', 'text_input', 'number_input', 'attendance'].includes(blockType);
     visibilitySelect.style.display = isQuestion ? 'block' : 'none';
+    
+    // Hide textarea for calendar block (it doesn't need content)
+    if (contentTextarea) {
+        contentTextarea.style.display = blockType === 'calendar' ? 'none' : 'block';
+    }
 }
 
 function updateAttendanceAvailability() {
@@ -349,6 +355,8 @@ async function renderParty(partyId) {
 
         const nameInput = p.querySelector("input#party-name-input");
         const dateInput = p.querySelector("input#party-date-input");
+        const durationInput = p.querySelector("input#party-duration-input");
+        const locationInput = p.querySelector("input#party-location-input");
         const respondUntilInput = p.querySelector("input#party-respond-until-input");
         const maxGuestsInput = p.querySelector("input#party-max-guests-input");
         const publicLinkContainer = p.querySelector("#public-link-container");
@@ -357,6 +365,8 @@ async function renderParty(partyId) {
 
         nameInput.value = partyDetails.name;
         dateInput.value = partyDetails.date || '';
+        durationInput.value = partyDetails.duration || 0;
+        locationInput.value = partyDetails.location || '';
         respondUntilInput.value = partyDetails.respond_until || '';
         maxGuestsInput.value = partyDetails.max_guests || 0;
         frozenInput.checked = partyDetails.frozen || false;
@@ -678,6 +688,8 @@ async function saveParty(partyId) {
     try {
         const nameInput = document.querySelector("input#party-name-input");
         const dateInput = document.querySelector("input#party-date-input");
+        const durationInput = document.querySelector("input#party-duration-input");
+        const locationInput = document.querySelector("input#party-location-input");
         const respondUntilInput = document.querySelector("input#party-respond-until-input");
         const maxGuestsInput = document.querySelector("input#party-max-guests-input");
         const frozenInput = document.querySelector("input#party-frozen-input");
@@ -710,6 +722,8 @@ async function saveParty(partyId) {
             name: partyName,
             invitation_blocks: JSON.stringify(invitationBlocks),
             date: dateInput ? dateInput.value : '',
+            duration: durationInput ? parseFloat(durationInput.value) || 0 : 0,
+            location: locationInput ? locationInput.value.trim() : '',
             respond_until: respondUntilInput ? respondUntilInput.value : '',
             max_guests: maxGuestsInput ? parseInt(maxGuestsInput.value) || 0 : 0,
             frozen: frozenInput ? frozenInput.checked : false,

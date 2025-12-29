@@ -77,6 +77,7 @@ class InvitationView {
             attendance_item: document.querySelector("template#attendance-item"),
             text_input: document.querySelector("template#text-input"),
             number_input: document.querySelector("template#number-input"),
+            calendar: document.querySelector("template#calendar"),
             public_stats: document.querySelector("template#public-stats"),
             response_item: document.querySelector("template#response-item"),
             status_saving: document.querySelector("template#status-saving"),
@@ -134,6 +135,8 @@ class InvitationView {
                     return this.createTextInput(content, answer_data, blockId, other_guests_answers, guestData, isOrganizer, onInputChange);
                 case 'number_input':
                     return this.createNumberInput(content, answer_data, blockId, other_guests_answers, guestData, isOrganizer, onInputChange);
+                case 'calendar':
+                    return this.createCalendar();
                 default:
                     return this.templates.error.content.cloneNode(true);
             }
@@ -669,6 +672,33 @@ class InvitationView {
         }
 
         return ni;
+    }
+
+    createCalendar() {
+        const cal = this.templates.calendar.content.cloneNode(true);
+        const downloadBtn = cal.querySelector('.download-calendar-btn');
+        
+        downloadBtn.addEventListener('click', async () => {
+            // Get the invitation ID from the URL
+            const url = new URL(window.location.href);
+            const invitationId = url.pathname.split('/').pop();
+            
+            if (!invitationId) {
+                console.error('No invitation ID found');
+                return;
+            }
+            
+            try {
+                // Open the .ics file in a new window/tab, allowing the browser/OS to handle it
+                // This typically prompts the user to add it to their calendar app
+                window.open(`/invitation/${invitationId}/ics`, '_blank');
+            } catch (error) {
+                console.error('Error opening calendar:', error);
+                alert('Failed to open calendar file. Please try again.');
+            }
+        });
+        
+        return cal;
     }
 
     showSaveStatus(status, message) {

@@ -693,8 +693,85 @@ pub async fn register(req: actix_web::HttpRequest) -> impl Responder {
         .body(html_content)
 }
 
+#[get("/{invitation_id}/ics")]
+async fn download_calendar(
+    path: web::Path<String>,
+    db: web::Data<Pool<SqliteConnectionManager>>,
+) -> impl Responder {
+    let invitation_id = path.into_inner();
+
+    let conn = match db.get() {
+        Ok(conn) => conn,
+        Err(_) => return HttpResponse::InternalServerError().body("Database connection failed"),
+    };
+
+    // Get party details for this invitation
+    let party_info = match conn
+        .prepare("SELECT p.name, p.date, p.duration, p.location FROM parties p JOIN invitations i ON p.id = i.party_id WHERE i.id = ?1")
+        .and_then(|mut stmt| {
+            stmt.query_row([&invitation_id], |row| {
+                let name: String = row.get(0)?;
+                let date: String = row.get(1)?;
+                let duration: f64 = row.get(2)?;
+                let location: String = row.get(3)?;
+                Ok((name, date, duration, location))
+            })
+        }) {
+        Ok(info) => info,
+        Err(_) => return HttpResponse::NotFound().body("Invitation not found"),
+    };
+
+    let (party_name, party_date, duration_hours, location) = party_info;
+
+    // Parse the party date
+    let start_dt = if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(&party_date, "%Y-%m-%dT%H:%M:%S") {
+        dt
+    } else if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(&party_date, "%Y-%m-%dT%H:%M") {
+        dt
+    } else {
+        return HttpResponse::BadRequest().body("Invalid party date format");
+    };
+
+    // Calculate end time (convert hours to minutes)
+    let duration_minutes = (duration_hours * 60.0).round() as i64;
+    let end_dt = start_dt + chrono::Duration::minutes(duration_minutes);
+
+    // Generate unique ID for the event
+    let event_uid = format!("{}@party-hub", invitation_id);
+
+    // Get current timestamp for DTSTAMP
+    let now = chrono::Utc::now();
+
+    // Format dates for iCalendar (UTC format)
+    let dtstart = start_dt.format("%Y%m%dT%H%M%S").to_string();
+    let dtend = end_dt.format("%Y%m%dT%H%M%S").to_string();
+    let dtstamp = now.format("%Y%m%dT%H%M%SZ").to_string();
+
+    // Build invitation URL
+    let invitation_url = format!("https://party-hub.com/{}", invitation_id); // TODO: Use actual host
+
+    // Generate iCalendar file
+    let ics_content = format!(
+        "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Party Hub//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nBEGIN:VEVENT\r\nUID:{}\r\nDTSTAMP:{}\r\nDTSTART:{}\r\nDTEND:{}\r\nSUMMARY:{}\r\nLOCATION:{}\r\nDESCRIPTION:Invitation link: {}\r\nURL:{}\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+        event_uid,
+        dtstamp,
+        dtstart,
+        dtend,
+        party_name.replace(",", "\\,").replace("\n", "\\n"),
+        location.replace(",", "\\,").replace("\n", "\\n"),
+        invitation_url,
+        invitation_url
+    );
+
+    HttpResponse::Ok()
+        .content_type("text/calendar; charset=utf-8")
+        .append_header(("Content-Disposition", format!("inline; filename=\"{}.ics\"", party_name.replace("/", "-").replace("\\", "-"))))
+        .body(ics_content)
+}
+
 pub fn subroutes() -> Scope {
     web::scope("/invitation")
         .service(details)
         .service(save_answers)
+        .service(download_calendar)
 }

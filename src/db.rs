@@ -19,6 +19,8 @@ pub struct Party {
     pub public: bool,
     pub max_guests: i64,
     pub has_rsvp_block: bool,
+    pub duration: f64, // Duration in hours
+    pub location: String, // Party location/address
 }
 
 impl Party {
@@ -34,6 +36,8 @@ impl Party {
             public: row.get("public")?,
             max_guests: row.get("max_guests")?,
             has_rsvp_block: row.get("has_rsvp_block")?,
+            duration: row.get("duration")?,
+            location: row.get("location")?,
         })
     }
 
@@ -154,7 +158,9 @@ pub fn prepare_db() -> Result<()> {
             frozen BOOLEAN NOT NULL DEFAULT FALSE,
             public BOOLEAN NOT NULL DEFAULT FALSE,
             max_guests INTEGER NOT NULL DEFAULT 0,
-            has_rsvp_block BOOLEAN NOT NULL DEFAULT FALSE
+            has_rsvp_block BOOLEAN NOT NULL DEFAULT FALSE,
+            duration REAL NOT NULL DEFAULT 0,
+            location TEXT NOT NULL DEFAULT ''
         )",
         (),
     )?;

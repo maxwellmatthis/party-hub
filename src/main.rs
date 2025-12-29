@@ -16,6 +16,7 @@ async fn serve_static(path: web::Path<String>) -> impl Responder {
     // Whitelist of allowed static files for security
     let allowed_files = vec![
         "auth.css",
+        "calendar.svg",
         "chevrons-down.svg",
         "chevrons-up.svg",
         "chevron-down.svg",

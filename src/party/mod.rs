@@ -63,7 +63,7 @@ async fn get_parties(
 
     // Get all parties for this author
     let parties_result = conn
-        .prepare("SELECT id, name, author, invitation_blocks, date, respond_until, frozen, public, max_guests, has_rsvp_block FROM parties WHERE author = ?1")
+        .prepare("SELECT id, name, author, invitation_blocks, date, duration, location, respond_until, frozen, public, max_guests, has_rsvp_block FROM parties WHERE author = ?1")
         .and_then(|mut stmt| {
             let party_iter = stmt.query_map([&author_id], Party::from_row)?;
 
@@ -103,6 +103,8 @@ async fn create_party(
         let default_name = "New Party";
         let default_invitation_blocks = "[]";
         let default_date = "";
+        let default_duration = 1.0;
+        let default_location = "";
         let default_respond_until = "";
         let default_frozen = false;
         let default_public = false;
@@ -111,7 +113,7 @@ async fn create_party(
 
         let result = conn
             .prepare(
-                "INSERT INTO parties (id, name, invitation_blocks, author, date, respond_until, frozen, public, max_guests, has_rsvp_block) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                "INSERT INTO parties (id, name, invitation_blocks, author, date, duration, location, respond_until, frozen, public, max_guests, has_rsvp_block) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             )
             .and_then(|mut stmt| {
                 stmt.execute(rusqlite::params![
@@ -120,6 +122,8 @@ async fn create_party(
                     default_invitation_blocks,
                     &author_id,
                     default_date,
+                    default_duration,
+                    default_location,
                     default_respond_until,
                     default_frozen,
                     default_public,
@@ -178,7 +182,7 @@ async fn get_party_details(
     // Get party details, ensuring it belongs to the authenticated author
     let party = match conn
         .prepare(
-            "SELECT id, name, author, invitation_blocks, date, respond_until, frozen, public, max_guests, has_rsvp_block FROM parties WHERE id = ?1 AND author = ?2",
+            "SELECT id, name, author, invitation_blocks, date, duration, location, respond_until, frozen, public, max_guests, has_rsvp_block FROM parties WHERE id = ?1 AND author = ?2",
         )
         .and_then(|mut stmt| stmt.query_row([&party_id, &author_id], Party::from_row))
     {
@@ -231,6 +235,8 @@ async fn get_party_details(
         "id": party.id,
         "name": party.name,
         "date": party.date,
+        "duration": party.duration,
+        "location": party.location,
         "respond_until": party.respond_until,
         "frozen": party.frozen,
         "public": party.public,
@@ -248,6 +254,8 @@ struct SavePartyForm {
     name: String,
     invitation_blocks: Option<String>,
     date: Option<String>,
+    duration: Option<f64>,
+    location: Option<String>,
     respond_until: Option<String>,
     frozen: Option<bool>,
     public: Option<bool>,
@@ -271,6 +279,8 @@ async fn update_party(
                 let conn = pool.get().unwrap();
                 let invitation_blocks = form.invitation_blocks.as_deref().unwrap_or("[]");
                 let date = form.date.as_deref().unwrap_or("");
+                let duration = form.duration.unwrap_or(0.0);
+                let location = form.location.as_deref().unwrap_or("");
                 let respond_until = form.respond_until.as_deref().unwrap_or("");
                 let frozen = form.frozen.unwrap_or(false);
                 let public = form.public.unwrap_or(false);
@@ -304,8 +314,8 @@ async fn update_party(
                 };
 
                 let result = conn
-                    .prepare("UPDATE parties SET name = ?1, invitation_blocks = ?2, date = ?3, respond_until = ?4, frozen = ?5, public = ?6, max_guests = ?7, has_rsvp_block = ?8 WHERE id = ?9 AND author = ?10")
-                    .and_then(|mut stmt| stmt.execute(rusqlite::params![&form.name, invitation_blocks, date, respond_until, frozen, public, max_guests, has_rsvp_block, &party_id, &author_id]));
+                    .prepare("UPDATE parties SET name = ?1, invitation_blocks = ?2, date = ?3, duration = ?4, location = ?5, respond_until = ?6, frozen = ?7, public = ?8, max_guests = ?9, has_rsvp_block = ?10 WHERE id = ?11 AND author = ?12")
+                    .and_then(|mut stmt| stmt.execute(rusqlite::params![&form.name, invitation_blocks, date, duration, location, respond_until, frozen, public, max_guests, has_rsvp_block, &party_id, &author_id]));
 
                 match result {
                     Ok(rows_affected) => {
