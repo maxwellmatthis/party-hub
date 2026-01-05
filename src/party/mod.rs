@@ -105,6 +105,69 @@ async fn get_parties(
         }
     }
 }
+#[get("/raw")]
+async fn get_parties_raw(
+    req: actix_web::HttpRequest,
+    db: web::Data<Pool<SqliteConnectionManager>>,
+) -> impl Responder {
+    // Check authentication
+    let author_id = match is_authenticated_as_author(&req, &db) {
+        Some(id) => id,
+        None => {
+            return HttpResponse::Unauthorized().json(json!({
+                "error": "Authentication required"
+            }));
+        }
+    };
+
+    let conn = match db.get() {
+        Ok(conn) => conn,
+        Err(_) => {
+            return HttpResponse::InternalServerError().json(json!({
+                "error": "Database connection failed"
+            }));
+        }
+    };
+
+    let parties_result = conn
+        .prepare(
+            "SELECT id, name, author, invitation_blocks, date, duration, location, respond_until, frozen, public, max_guests, has_rsvp_block FROM parties WHERE author = ?1"
+        )
+        .and_then(|mut stmt| {
+            let party_iter = stmt.query_map([&author_id], Party::from_row)?;
+
+            let mut parties = Vec::new();
+            for party in party_iter {
+                if let Ok(p) = party {
+                    parties.push(json!({
+                        "id": p.id,
+                        "name": p.name,
+                        "author": p.author,
+                        "invitation_blocks": p.invitation_blocks,
+                        "date": p.date,
+                        "duration": p.duration,
+                        "location": p.location,
+                        "respond_until": p.respond_until,
+                        "frozen": p.frozen,
+                        "public": p.public,
+                        "max_guests": p.max_guests,
+                        "has_rsvp_block": p.has_rsvp_block
+                    }));
+                }
+            }
+            Ok(parties)
+        });
+
+    match parties_result {
+        Ok(parties) => HttpResponse::Ok().json(parties),
+        Err(e) => {
+            eprintln!("Database error: {}", e);
+            HttpResponse::InternalServerError().json(json!({
+                "error": "Failed to fetch parties"
+            }))
+        }
+    }
+}
 
 #[post("/new")]
 async fn create_party(
@@ -747,6 +810,7 @@ pub fn subroutes() -> Scope {
         .service(update_party)
         .service(delete_party)
         .service(get_parties)
+        .service(get_parties_raw)
         .service(get_party_details)
         .service(add_guest_to_party)
         .service(remove_guest_from_party)

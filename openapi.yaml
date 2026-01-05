@@ -1,0 +1,119 @@
+openapi: 3.0.3
+info:
+  title: Party Hub Management API
+  description: API for managing parties, guests, and invitations in Party Hub
+  version: "0.2.0"
+
+servers:
+  - url: http://127.0.0.1:8080
+    description: Local development server
+
+paths:
+  /party:
+    get:
+      summary: Get all parties (summary)
+      description: Returns a summarized list of parties belonging to the authenticated author.
+      responses:
+        "200":
+          description: List of parties
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PartySummary"
+        "401":
+          description: Authentication required
+
+  /party/raw:
+    get:
+      summary: Get all parties (raw, unfiltered)
+      description: |
+        Returns all parties for the authenticated author without filtering
+        or combining fields. Intended for programmatic access.
+      responses:
+        "200":
+          description: Raw party objects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PartyRaw"
+        "401":
+          description: Authentication required
+
+  /party/{party_id}:
+    get:
+      summary: Get full party details
+      parameters:
+        - name: party_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Party details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PartyDetails"
+        "401":
+          description: Authentication required
+        "404":
+          description: Party not found
+
+components:
+  schemas:
+    PartySummary:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        date:
+          type: string
+        frozen:
+          type: boolean
+        public:
+          type: boolean
+
+    PartyRaw:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        author:
+          type: string
+        invitation_blocks:
+          type: string
+        date:
+          type: string
+        duration:
+          type: number
+        location:
+          type: string
+        respond_until:
+          type: string
+        frozen:
+          type: boolean
+        public:
+          type: boolean
+        max_guests:
+          type: integer
+        has_rsvp_block:
+          type: boolean
+
+    PartyDetails:
+      allOf:
+        - $ref: "#/components/schemas/PartyRaw"
+        - type: object
+          properties:
+            guests:
+              type: array
+              items:
+                type: object
