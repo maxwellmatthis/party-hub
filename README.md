@@ -8,6 +8,14 @@ A modern, minimalistic party invitation platform built with Rust (Actix Web), SQ
 ![Guest Invitation View](examples/Party-Hub-Invitation.png)
 *Guest-facing invitation with real-time statistics*
 
+### Invitation Builder (Multiple Question Types)
+
+Build invitations using flexible blocks such as attendance (RSVP),
+single choice, text input, and more.
+
+![Invitation Builder](examples/Party-Hub-Invitation-Builder.png)
+
+
 ## Features
 
 - 🎉 **Custom Party Creation**: Create parties with flexible block-based invitation editor
