@@ -1,4 +1,5 @@
-use actix_web::{App, HttpResponse, HttpServer, Responder, get, web};
+use actix_files::NamedFile;
+use actix_web::{App, HttpResponse, HttpServer, get, web};
 use db::prepare_db;
 use r2d2_sqlite::SqliteConnectionManager;
 use std::env;
@@ -10,84 +11,36 @@ mod invitation;
 mod notification;
 mod party;
 
-#[get("/static/{filename}")]
-async fn serve_static(path: web::Path<String>) -> impl Responder {
+#[get("/static/{filename:.*}")]
+async fn serve_static(path: web::Path<String>) -> actix_web::Result<NamedFile> {
     let filename = path.into_inner();
-
-    // Whitelist of allowed static files for security
-    let allowed_files = vec![
-        "auth.css",
-        "calendar.svg",
-        "chevrons-down.svg",
-        "chevrons-up.svg",
-        "chevron-down.svg",
-        "chevron-up.svg",
-        "clipboard.svg",
-        "index.css",
-        "index.js",
-        "invitation.css",
-        "invitation.js",
-        "manage.css",
-        "manage.js",
-        "menu.svg",
-        "plus.svg",
-        "style.css",
-        "trash-2.svg",
-        "whyemptycat.png",
-        "favicon.ico",
-        "x.svg",
-        "public_guest.js",
-        "manifest.json",
-        "web-push.js"
-    ];
-
-    // Check if the requested file is in the whitelist
-    if !allowed_files.contains(&filename.as_str()) {
-        return HttpResponse::NotFound().body("File not found");
-    }
-
-    // Construct the file path
     let file_path = format!("static/{}", filename);
-
-    // Read the file
-    let file_content = match fs::read(&file_path) {
-        Ok(content) => content,
-        Err(_) => return HttpResponse::NotFound().body("File not found"),
-    };
-
-    // Determine content type based on file extension
-    let content_type = match filename.split('.').last() {
-        Some("js") => "application/javascript",
-        Some("css") => "text/css",
-        Some("html") => "text/html",
-        Some("png") => "image/png",
-        Some("jpg") | Some("jpeg") => "image/jpeg",
-        Some("svg") => "image/svg+xml",
-        Some("gif") => "image/gif",
-        Some("ico") => "image/x-icon",
-        Some("json") => "application/json",
-        Some("txt") => "text/plain",
-        _ => "application/octet-stream",
-    };
-
-    HttpResponse::Ok()
-        .content_type(content_type)
-        .body(file_content)
+    Ok(NamedFile::open(file_path)?)
 }
 
 #[get("/web-push-service-worker.js")]
-async fn serve_service_worker() -> impl Responder {
+async fn serve_service_worker() -> HttpResponse {
     let file_path = "static/web-push-service-worker.js";
-    
+
     let file_content = match fs::read(file_path) {
         Ok(content) => content,
-        Err(_) => return HttpResponse::NotFound().body("Service worker not found"),
+        Err(_) => return HttpResponse::NotFound().body("Service worker script not found"),
     };
 
     HttpResponse::Ok()
         .content_type("application/javascript")
         .insert_header(("Service-Worker-Allowed", "/"))
         .body(file_content)
+}
+
+#[get("/favicon.ico")]
+async fn serve_favicon() -> actix_web::Result<NamedFile> {
+    Ok(NamedFile::open("static/logo/favicon.ico")?)
+}
+
+#[get("/manifest.json")]
+async fn serve_manifest() -> actix_web::Result<NamedFile> {
+    Ok(NamedFile::open("static/manifest.json")?)
 }
 
 fn detect_language(req: &actix_web::HttpRequest) -> String {
@@ -137,27 +90,38 @@ async fn main() -> std::io::Result<()> {
     let smtp_client_configured = notification::is_smtp_client_configured();
     let smtp_direct_configured = notification::is_smtp_direct_configured();
     let mail_sendtype = env::var("MAIL_SENDTYPE").ok();
-    
+
     match mail_sendtype.as_deref() {
         Some("client") => {
             if smtp_client_configured {
-                println!("INFO: Email notifications enabled via SMTP client (MAIL_SENDTYPE=client)");
+                println!(
+                    "INFO: Email notifications enabled via SMTP client (MAIL_SENDTYPE=client)"
+                );
             } else {
                 println!("WARNING: MAIL_SENDTYPE set to 'client' but SMTP client not configured.");
-                println!("         Set SMTP_SERVER, SMTP_USERNAME, SMTP_PASSWORD, and SMTP_FROM to enable.");
+                println!(
+                    "         Set SMTP_SERVER, SMTP_USERNAME, SMTP_PASSWORD, and SMTP_FROM to enable."
+                );
             }
         }
         Some("direct") => {
             if smtp_direct_configured {
-                println!("INFO: Email notifications enabled via direct SMTP (MAIL_SENDTYPE=direct)");
-                println!("      Make sure your domain has proper SPF/DKIM/DMARC records configured.");
+                println!(
+                    "INFO: Email notifications enabled via direct SMTP (MAIL_SENDTYPE=direct)"
+                );
+                println!(
+                    "      Make sure your domain has proper SPF/DKIM/DMARC records configured."
+                );
             } else {
                 println!("WARNING: MAIL_SENDTYPE set to 'direct' but direct SMTP not configured.");
                 println!("         Set SMTP_FROM to enable direct SMTP sending.");
             }
         }
         Some(other) => {
-            println!("WARNING: Invalid MAIL_SENDTYPE value '{}'. Use 'client' or 'direct'.", other);
+            println!(
+                "WARNING: Invalid MAIL_SENDTYPE value '{}'. Use 'client' or 'direct'.",
+                other
+            );
             if !smtp_client_configured && !smtp_direct_configured {
                 println!("         Email notifications disabled (no email method configured).");
             }
@@ -168,11 +132,17 @@ async fn main() -> std::io::Result<()> {
                 println!("INFO: Email notifications enabled via SMTP client (auto-detected)");
             } else if smtp_direct_configured {
                 println!("INFO: Email notifications enabled via direct SMTP (auto-detected)");
-                println!("      Make sure your domain has proper SPF/DKIM/DMARC records configured.");
+                println!(
+                    "      Make sure your domain has proper SPF/DKIM/DMARC records configured."
+                );
             } else {
                 println!("WARNING: Email notifications disabled (no email method configured).");
-                println!("         Set SMTP_SERVER, SMTP_USERNAME, SMTP_PASSWORD, and SMTP_FROM for SMTP client,");
-                println!("         or set SMTP_FROM for direct SMTP, or use MAIL_SENDTYPE to specify a method.");
+                println!(
+                    "         Set SMTP_SERVER, SMTP_USERNAME, SMTP_PASSWORD, and SMTP_FROM for SMTP client,"
+                );
+                println!(
+                    "         or set SMTP_FROM for direct SMTP, or use MAIL_SENDTYPE to specify a method."
+                );
             }
         }
     }
@@ -181,6 +151,8 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(web::Data::new(pool.clone()))
             .service(serve_service_worker)
+            .service(serve_manifest)
+            .service(serve_favicon)
             .service(serve_static)
             .service(auth::subroutes())
             .service(guest::subroutes())

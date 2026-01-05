@@ -77,7 +77,7 @@ async fn send_email_direct(
         .map_err(|e| format!("Failed to build email: {}", e))?;
 
     // Try each MX server in order of priority
-    for (priority, mx_host) in mx_records {
+    for (_priority, mx_host) in mx_records {
         // For direct MX connections, we need to be more lenient with TLS
         // Many MX servers have certificates that don't exactly match their hostname
         let tls = match TlsParameters::builder(mx_host.clone())
