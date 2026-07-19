@@ -110,11 +110,8 @@ __Customization__
 ### VAPID Keys Generation
 
 ```bash
-# Install web-push CLI globally
-npm install -g web-push
-
 # Generate VAPID keys
-web-push generate-vapid-keys
+npx web-push generate-vapid-keys
 ```
 
 ### Email Notifications Setup (Optional)

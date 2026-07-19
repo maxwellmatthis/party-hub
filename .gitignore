@@ -3,5 +3,6 @@
 
 # production data
 /*.db
+/*.bak
 /*.yaml
 /*.pem

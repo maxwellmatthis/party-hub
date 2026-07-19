@@ -24,4 +24,3 @@ ReadWritePaths=/var/lib/party-hub
 
 [Install]
 WantedBy=multi-user.target
-
