@@ -1,5 +1,6 @@
 use crate::db::Author;
 use crate::detect_language;
+use crate::config::AppConfig;
 use actix_web::{
     HttpResponse, Responder, Scope,
     cookie::{Cookie, SameSite},
@@ -8,7 +9,6 @@ use actix_web::{
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use serde::Deserialize;
-use std::env;
 use std::fs;
 use time::{Duration, OffsetDateTime};
 
@@ -39,6 +39,7 @@ struct AuthForm {
 async fn auth_post(
     form: web::Form<AuthForm>,
     db: web::Data<Pool<SqliteConnectionManager>>,
+    config: web::Data<AppConfig>,
 ) -> impl Responder {
     let conn = match db.get() {
         Ok(conn) => conn,
@@ -56,7 +57,7 @@ async fn auth_post(
             let expiry = OffsetDateTime::now_utc() + Duration::days(90); // 3 months
 
             // Only use secure=false in development environment
-            let is_dev = env::var("ENV").unwrap_or_else(|_| "prod".to_string()) == "dev";
+            let is_dev = config.env_mode.as_deref() == Some("dev");
 
             let cookie = Cookie::build("auth_token", &form.author_secret)
                 .path("/")

@@ -1,19 +1,11 @@
+use crate::config::AppConfig;
 use actix_web::web;
-use lettre::{Message, SmtpTransport, Transport};
 use lettre::transport::smtp::client::{Tls, TlsParameters};
+use lettre::{Message, SmtpTransport, Transport};
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use hickory_resolver::TokioAsyncResolver;
-use std::sync::OnceLock;
 use uuid::Uuid;
-
-static SMTP_DIRECT_CONFIGURED: OnceLock<bool> = OnceLock::new();
-
-pub fn is_smtp_direct_configured() -> bool {
-    *SMTP_DIRECT_CONFIGURED.get_or_init(|| {
-        std::env::var("SMTP_FROM").is_ok()
-    })
-}
 
 /// Get MX records for a domain, sorted by priority (lower number = higher priority)
 async fn get_mx_records(domain: &str) -> Result<Vec<(u16, String)>, String> {
@@ -118,18 +110,16 @@ async fn send_email_direct(
 }
 
 /// Sends emails to guests directly to their mail servers (requires SPF/DKIM setup)
-/// This bypasses your SMTP provider and sends directly to recipient's mail servers
-/// Requires environment variable: SMTP_FROM (sender address)
 pub async fn send_emails_direct(
     db: web::Data<Pool<SqliteConnectionManager>>,
+    config: &AppConfig,
     subject: String,
     body: String,
     guest_ids: Vec<String>,
 ) -> Result<(), String> {
-    // Get from address from environment
-    let smtp_from = match std::env::var("SMTP_FROM") {
-        Ok(addr) => addr,
-        Err(_) => {
+    let smtp_from = match &config.smtp_from {
+        Some(addr) => addr,
+        None => {
             return Ok(());
         }
     };
@@ -173,7 +163,7 @@ pub async fn send_emails_direct(
         let recipient_name = format!("{} {}", first, last).trim().to_string();
         let to_addr = format!("{} <{}>", recipient_name, email);
 
-        match send_email_direct(&smtp_from, &to_addr, &email, &subject, &body).await {
+        match send_email_direct(smtp_from, &to_addr, &email, &subject, &body).await {
             Ok(_) => {
             }
             Err(e) => {

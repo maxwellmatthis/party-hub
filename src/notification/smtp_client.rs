@@ -1,40 +1,32 @@
+use crate::config::AppConfig;
 use actix_web::web;
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{Message, SmtpTransport, Transport};
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
-use std::sync::OnceLock;
 
-static SMTP_CLIENT_CONFIGURED: OnceLock<bool> = OnceLock::new();
-
-pub fn is_smtp_client_configured() -> bool {
-    *SMTP_CLIENT_CONFIGURED.get_or_init(|| {
-        std::env::var("SMTP_SERVER").is_ok()
-            && std::env::var("SMTP_USERNAME").is_ok()
-            && std::env::var("SMTP_PASSWORD").is_ok()
-            && std::env::var("SMTP_FROM").is_ok()
-    })
+pub fn is_smtp_client_configured(config: &AppConfig) -> bool {
+    config.smtp_client_configured()
 }
 
 /// Sends emails to guests via SMTP client (authenticated with mail provider)
-/// Requires environment variables: SMTP_SERVER, SMTP_USERNAME, SMTP_PASSWORD, SMTP_FROM
 /// If not configured, silently skips sending emails
 pub async fn send_emails_via_client(
     db: web::Data<Pool<SqliteConnectionManager>>,
+    config: &AppConfig,
     subject: String,
     body: String,
     guest_ids: Vec<String>,
 ) -> Result<(), String> {
     // Check if SMTP is configured - if not, skip silently
-    if !is_smtp_client_configured() {
+    if !is_smtp_client_configured(config) {
         return Ok(());
     }
 
-    // Get SMTP configuration from environment
-    let smtp_server = std::env::var("SMTP_SERVER").unwrap();
-    let smtp_username = std::env::var("SMTP_USERNAME").unwrap();
-    let smtp_password = std::env::var("SMTP_PASSWORD").unwrap();
-    let smtp_from = std::env::var("SMTP_FROM").unwrap();
+    let smtp_server = config.smtp_server.as_ref().unwrap();
+    let smtp_username = config.smtp_username.as_ref().unwrap();
+    let smtp_password = config.smtp_password.as_ref().unwrap();
+    let smtp_from = config.smtp_from.as_ref().unwrap();
 
     let conn = db.get().map_err(|_| "Database connection failed")?;
 
@@ -71,8 +63,8 @@ pub async fn send_emails_via_client(
     }
 
     // Create SMTP transport
-    let creds = Credentials::new(smtp_username, smtp_password);
-    let mailer = SmtpTransport::relay(&smtp_server)
+    let creds = Credentials::new(smtp_username.clone(), smtp_password.clone());
+    let mailer = SmtpTransport::relay(smtp_server)
         .map_err(|e| format!("Failed to create SMTP transport: {}", e))?
         .credentials(creds)
         .build();
@@ -84,6 +76,7 @@ pub async fn send_emails_via_client(
         let message = Message::builder()
             .from(
                 smtp_from
+                    .as_str()
                     .parse()
                     .map_err(|e| format!("Invalid from address: {}", e))?,
             )

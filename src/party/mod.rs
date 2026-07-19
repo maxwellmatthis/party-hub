@@ -1,4 +1,5 @@
 use crate::auth::is_authenticated_as_author;
+use crate::config::AppConfig;
 use crate::db::Party;
 use crate::detect_language;
 use actix_web::{HttpRequest, HttpResponse, Responder, Scope, delete, get, post, web};
@@ -287,6 +288,7 @@ async fn update_party(
     path: web::Path<String>,
     form: web::Json<SavePartyForm>,
     pool: web::Data<r2d2::Pool<SqliteConnectionManager>>,
+    config: web::Data<AppConfig>,
     req: HttpRequest,
 ) -> impl Responder {
     let party_id = path.into_inner();
@@ -371,13 +373,14 @@ async fn update_party(
                                         // Send push notifications
                                         let _ = crate::notification::send_push(
                                             pool.clone(),
+                                            config.as_ref(),
                                             notification_content.clone(),
                                             guest_invitation_map.clone(),
                                         ).await;
                                         
                                         // Send emails individually with correct invitation links
                                         let email_subject = format!("Party Update: {}", form.name);
-                                        let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
+                                        let base_url = config.base_url.as_str();
                                         
                                         for (guest_id, invitation_id) in guest_invitation_map {
                                             let email_body = format!("{}\n\nView your invitation at: {}/{}", 
@@ -387,6 +390,7 @@ async fn update_party(
                                             );
                                             let _ = crate::notification::send_emails(
                                                 pool.clone(),
+                                                config.as_ref(),
                                                 email_subject.clone(),
                                                 email_body,
                                                 vec![guest_id],
@@ -511,6 +515,7 @@ fn verify_party_ownership(
 async fn add_guest_to_party(
     path: web::Path<(String, String)>,
     pool: web::Data<r2d2::Pool<SqliteConnectionManager>>,
+    config: web::Data<AppConfig>,
     req: HttpRequest,
 ) -> impl Responder {
     let (party_id, guest_id) = path.into_inner();
@@ -566,6 +571,7 @@ async fn add_guest_to_party(
                                         let notification_content = format!("You've been invited to {}!", party_name);
                                         let _ = crate::notification::send_push(
                                             pool.clone(),
+                                            config.as_ref(),
                                             notification_content.clone(),
                                             guest_invitation_map,
                                         ).await;
@@ -575,11 +581,12 @@ async fn add_guest_to_party(
                                         let email_body = format!(
                                             "You've been invited to {}!\n\nView your invitation at: {}/{}", 
                                             party_name,
-                                            std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string()),
+                                            config.base_url.as_str(),
                                             invitation_id
                                         );
                                         let _ = crate::notification::send_emails(
                                             pool.clone(),
+                                            config.as_ref(),
                                             email_subject,
                                             email_body,
                                             vec![guest_id.clone()],

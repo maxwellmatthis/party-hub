@@ -1,0 +1,27 @@
+[Unit]
+Description=Party Hub Service
+After=network.target
+
+[Service]
+Type=simple
+User=party-hub
+Group=party-hub
+StandardOutput=inherit
+StandardError=inherit
+Restart=on-failure
+
+# Config
+ExecStart=/usr/local/bin/party-hub
+WorkingDirectory=/var/lib/party-hub
+EnvironmentFile=/etc/party-hub/config.env
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/party-hub
+
+[Install]
+WantedBy=multi-user.target
+

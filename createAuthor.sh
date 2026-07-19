@@ -13,11 +13,10 @@ if [ $# -eq 0 ]; then
 fi
 
 AUTHOR_NAME="$1"
-DB_FILE="party.db"
 
 # Check if database file exists
-if [ ! -f "$DB_FILE" ]; then
-    echo "Error: Database file '$DB_FILE' not found."
+if [ ! -f "$SQLITE_DB_PATH" ]; then
+    echo "Error: Database file '$SQLITE_DB_PATH' not found."
     echo "Please run the application first to create the database, or run from the correct directory."
     exit 1
 fi
@@ -30,7 +29,7 @@ AUTHOR_ID=$(cat /proc/sys/kernel/random/uuid 2>/dev/null || uuidgen 2>/dev/null 
 AUTHOR_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 64 /dev/urandom | xxd -p | tr -d '\n' || echo "$(date +%s)$(($RANDOM))$(date +%N)" | sha256sum | cut -d' ' -f1)
 
 # Insert the new author into the database
-sqlite3 "$DB_FILE" "INSERT INTO authors (id, name, author_secret) VALUES ('$AUTHOR_ID', '$AUTHOR_NAME', '$AUTHOR_SECRET');"
+sqlite3 "$SQLITE_DB_PATH" "INSERT INTO authors (id, name, author_secret) VALUES ('$AUTHOR_ID', '$AUTHOR_NAME', '$AUTHOR_SECRET');"
 
 if [ $? -eq 0 ]; then
     echo "✅ Author '$AUTHOR_NAME' created successfully!"
@@ -43,3 +42,4 @@ else
     echo "❌ Failed to create author '$AUTHOR_NAME'"
     exit 1
 fi
+

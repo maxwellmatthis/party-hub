@@ -1,4 +1,5 @@
 use crate::db::Invitation;
+use crate::config::AppConfig;
 use crate::detect_language;
 use actix_web::{HttpResponse, Responder, Scope, get, post, web};
 use r2d2::Pool;
@@ -728,6 +729,7 @@ pub async fn register(req: actix_web::HttpRequest) -> impl Responder {
 async fn download_calendar(
     path: web::Path<String>,
     db: web::Data<Pool<SqliteConnectionManager>>,
+    config: web::Data<AppConfig>,
 ) -> impl Responder {
     let invitation_id = path.into_inner();
 
@@ -781,8 +783,7 @@ async fn download_calendar(
     let dtstamp = now.format("%Y%m%dT%H%M%SZ").to_string();
 
     // Build invitation URL
-    let base_url = std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
-    let invitation_url = format!("{}/{}", base_url, invitation_id);
+    let invitation_url = format!("{}/{}", config.base_url.as_str(), invitation_id);
 
     // Generate iCalendar file
     let ics_content = format!(

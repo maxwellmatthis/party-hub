@@ -41,71 +41,73 @@ A modern, minimalistic party invitation platform built with Rust (Actix Web), SQ
 
 ### Prerequisites
 
-- Rust (latest stable version)
+- Rust/Cargo (latest stable version)
 - SQLite3
+- NPX
 
 ### Installation & Setup
 
-1. **Clone and run**:
+1. **Clone**:
+   
+   Clone this repository to your home or git project directory.
 
    ```bash
    git clone https://github.com/maxwellmatthis/party-hub.git
    cd party-hub
-   cargo run
    ```
 
-   The server will start on `http://localhost:8080`
+2. **Compile and install**:
 
-2. **Create your first author account**:
+    **Production**
 
-   ```bash
-   ./createAuthor.sh "Your Name"
-   ```
+    If you are installing on a server for production use and are okay with a systemd/reverse proxy
+    setup, you can simply run the `install.sh` script. Check it out for more information.
 
-   Save the generated secret to log into the management interface.
+    You can safely rerun `install.sh` to perform updates. Just don't forget to `git pull` new
+    changes first. Config files and keys won't be touched if they already exist.
+
+    **Development or Testing**
+
+    For development purposes, it is recommended that you edit the development config and export the
+    environment variables to your current shell using `set -a; source dev-config.env; set +a`. Then
+    you can simply `cargo run` the project for development.
+
+3. **Create your first author account**:
+
+    Please note that this script assumes that SQLITE_DB_PATH is set.
+
+    ```bash
+    # run this line if you installed for production using the script.
+    export SQLITE_DB_PATH=/var/lib/party-hub/party.db
+
+    ./createAuthor.sh "Your Name"
+    ```
+
+    Save the generated secret to log into the management interface.
 
 ### Environment Variables
 
 Party Hub supports the following environment variables for configuration:
 
+__Required__
+
+- **`PUBLIC_VAPID_KEY_PATH`**: Path to public web-push key.
+- **`PRIVATE_VAPID_KEY_PATH`**: Path to private web-push key.
+- **`SQLITE_DB_PATH`**: Path to sqlite database.
+- **`WEB_ASSETS_PATH`**: Path to static assets to be served to the web.
+
+__Customization__
+
 - **`PORT`**: Set the server port (default: 8080)
-
-  ```bash
-  export PORT=3000
-  cargo run
-  ```
-
 - **`ENV`**: Set the environment mode (default: "prod")
   - `ENV=dev`: Enables development mode with insecure cookies for localhost testing
   - `ENV=prod`: Production mode with secure cookies (default)
-
-  ```bash
-  export ENV=dev
-  cargo run
-  ```
-
 - **`MAIL_SENDTYPE`**: Choose email sending method (optional)
   - `MAIL_SENDTYPE=client`: Use SMTP client (send through mail provider)
   - `MAIL_SENDTYPE=direct`: Use direct SMTP (send directly to recipient's server)
   - If not set: Automatically detects and uses available method (client preferred)
 
-  ```bash
-  # Force client mode
-  export MAIL_SENDTYPE=client
-  
-  # Force direct mode
-  export MAIL_SENDTYPE=direct
-  cargo run
-  ```
-
-  ```bash
-  export ENV=dev
-  cargo run
-  ```
-
-### VAPID Keys Setup
-
-1. **Generate keys**:
+### VAPID Keys Generation
 
 ```bash
 # Install web-push CLI globally
@@ -113,13 +115,6 @@ npm install -g web-push
 
 # Generate VAPID keys
 web-push generate-vapid-keys
-```
-
-2. **Save keys** in the project root:
-
-```bash
-echo "YOUR_PRIVATE_KEY_HERE" > private_vapid_key.pem
-echo "YOUR_PUBLIC_KEY_HERE" > public_vapid_key.pem
 ```
 
 ### Email Notifications Setup (Optional)
@@ -205,7 +200,7 @@ default._domainkey IN TXT "v=DKIM1; k=rsa; p=YOUR_PUBLIC_KEY_HERE"
 ```
 
 **Important Notes**:
-- DNS changes can take up to 48 hours to propagate
+- DNS changes can take hours or days to propagate
 - Test your configuration with [mail-tester.com](https://www.mail-tester.com/)
 - Without proper SPF/DKIM/DMARC, your emails will likely end up in spam
 - Major email providers (Gmail, Outlook) require DKIM for good deliverability
