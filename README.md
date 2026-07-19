@@ -2,6 +2,23 @@
 
 A modern, minimalistic party invitation platform built with Rust (Actix Web), SQLite, and vanilla JavaScript. Create beautiful party invitations with custom questions, gather responses, and display public statistics in real-time.
 
+## Table of Contents
+
+- [Party Hub](#party-hub)
+- [Features](#features)
+- [Quick Start](#quick-start)
+  - [Prerequisites](#prerequisites)
+  - [Installation & Setup](#installation--setup)
+- [Production Filesystem Overview](#production-filesystem-overview)
+- [Environment Variables](#environment-variables)
+  - [Required](#required)
+  - [Customization](#customization)
+- [VAPID Keys Generation](#vapid-keys-generation)
+- [Email Notifications Setup (Optional)](#email-notifications-setup-optional)
+  - [Option 1: SMTP Client (Using your email provider)](#option-1-smtp-client-using-your-email-provider)
+  - [Option 2: Direct SMTP (Send directly from your server)](#option-2-direct-smtp-send-directly-from-your-server)
+- [License](#license)
+
 ![Party Management Interface](examples/Party-Hub-Management.png)
 *Management interface for creating parties and managing guests*
 
@@ -48,7 +65,7 @@ A modern, minimalistic party invitation platform built with Rust (Actix Web), SQ
 ### Installation & Setup
 
 1. **Clone**:
-   
+
    Clone this repository to your home or git project directory.
 
    ```bash
@@ -85,18 +102,36 @@ A modern, minimalistic party invitation platform built with Rust (Actix Web), SQ
 
     Save the generated secret to log into the management interface.
 
-### Environment Variables
+## Production Filesystem Overview
+
+The installer provisions the following paths for a production deployment:
+
+| Path | Purpose | Permissions |
+| --- | --- | --- |
+| /etc/systemd/system/party-hub.service | Systemd unit file for the service | 644, root:root |
+| /etc/party-hub/ | Directory for shared config and VAPID keys | 755, root:root |
+| /etc/party-hub/config.env | Runtime environment configuration | 640, root:party-hub |
+| /etc/party-hub/public_vapid_key.pem | Public VAPID key used for web push notifications | 640, root:party-hub |
+| /etc/party-hub/private_vapid_key.pem | Private VAPID key used for web push notifications | 640, root:party-hub |
+| /var/lib/party-hub/ | Data directory for persistent application state | 750, party-hub:party-hub |
+| /var/lib/party-hub/party.db | SQLite database file | 640, party-hub:party-hub |
+| /var/www/assets/ | Root directory for served web assets | 750, party-hub:party-hub |
+| /var/www/assets/pages/ | Rendered HTML pages served by the app | 750, party-hub:party-hub |
+| /var/www/assets/static/ | CSS, JavaScript, images, and other static files | 750, party-hub:party-hub |
+| /usr/local/bin/party-hub | Installed application binary | 755, root:root |
+
+## Environment Variables
 
 Party Hub supports the following environment variables for configuration:
 
-__Required__
+### Required
 
 - **`PUBLIC_VAPID_KEY_PATH`**: Path to public web-push key.
 - **`PRIVATE_VAPID_KEY_PATH`**: Path to private web-push key.
 - **`SQLITE_DB_PATH`**: Path to sqlite database.
 - **`WEB_ASSETS_PATH`**: Path to static assets to be served to the web.
 
-__Customization__
+### Customization
 
 - **`PORT`**: Set the server port (default: 8080)
 - **`ENV`**: Set the environment mode (default: "prod")
@@ -106,129 +141,116 @@ __Customization__
   - `MAIL_SENDTYPE=client`: Use SMTP client (send through mail provider)
   - `MAIL_SENDTYPE=direct`: Use direct SMTP (send directly to recipient's server)
   - If not set: Automatically detects and uses available method (client preferred)
+  - => **Also see [Email Notification Setup](#email-notifications-setup-optional) below for more options.
 
-### VAPID Keys Generation
+## VAPID Keys Generation
+
+VAPID Keys are used to authenticate when sending push notifications.
 
 ```bash
 # Generate VAPID keys
-npx web-push generate-vapid-keys
+npx --yes web-push generate-vapid-keys
+
+# paste the resulting keys into these files for development or before moving to production secret directory
+vim public_vapid_key.pem
+vim private_vapid_key.pem
 ```
 
-### Email Notifications Setup (Optional)
+## Email Notifications Setup (Optional)
 
-Party Hub supports two methods for sending email notifications to guests:
+Party Hub supports two methods for sending email notifications to guests. If none is configured, emails will silently fail to be sent without further consequences. Push notifications are not influenced by email setup.
 
-#### Option 1: SMTP Client (Using your email provider)
+### Option 1: SMTP Client (Using your email provider)
 
-This method sends emails through your email provider's SMTP server (Gmail, Outlook, etc.). This is the easiest option but requires storing your email credentials on the server.
+This method sends emails through your email provider's SMTP server (Gmail, Outlook, etc.). This is the easiest option.
 
 1. **Set environment variables**:
 
-```bash
-export SMTP_SERVER="smtp.gmail.com"              # Your SMTP server
-export SMTP_USERNAME="your-email@gmail.com"      # Your email address
-export SMTP_PASSWORD="your-app-password"         # Your email password or app password
-export SMTP_FROM="Party Hub <noreply@yourdomain.com>"  # From address
-export BASE_URL="https://your-domain.com"        # Base URL for invitation links
-```
+    ```bash
+    export SMTP_SERVER="smtp.gmail.com"              # Your SMTP server
+    export SMTP_USERNAME="your-email@gmail.com"      # Your email address
+    export SMTP_PASSWORD="your-app-password"         # Your email password or app password
+    export SMTP_FROM="Party Hub <noreply@yourdomain.com>"  # From address
+    export BASE_URL="https://your-domain.com"        # Base URL for invitation links
+    ```
 
 2. **Common SMTP providers**:
 
-- **Gmail**: 
-  - Server: `smtp.gmail.com`
-  - Port: 587 (automatic)
-  - Requires an [App Password](https://support.google.com/accounts/answer/185833)
-  
-- **Outlook/Office 365**:
-  - Server: `smtp.office365.com`
-  - Port: 587 (automatic)
-  
-- **Custom/Self-hosted**:
-  - Use your mail server's SMTP details
+    - **Gmail**:
+      - Server: `smtp.gmail.com`
+      - Port: 587 (automatic)
+      - Requires an [App Password](https://support.google.com/accounts/answer/185833)
 
-#### Option 2: Direct SMTP (Send directly from your server)
+    - **Outlook/Office 365**:
+      - Server: `smtp.office365.com`
+      - Port: 587 (automatic)
 
-This method sends emails directly to recipients' mail servers without going through your email provider. This means **you don't need to store your email credentials on the server**, but it requires proper DNS configuration to avoid spam filters.
+    - **Custom/Self-hosted**:
+      - Use your mail server's SMTP details
+
+### Option 2: Direct SMTP (Send directly from your server)
+
+This method sends emails directly to recipients' mail servers without using a mail server. This means **you don't need to store your email credentials on the server**, but it requires proper DNS configuration to avoid spam filters.
+
+__Warning:__ Adding a second SPF record on top of already existing email infrastructure will
+likely break your mail server. Only chose this option if you have extensive control of your
+mail server or you do not run a mail server for your chosen domain but would like to send emails.
 
 1. **Set only the required environment variables**:
 
-```bash
-export SMTP_FROM="Party Hub <noreply@yourdomain.com>"  # Must match your domain
-export BASE_URL="https://your-domain.com"        # Base URL for invitation links
-```
+    ```bash
+    export SMTP_FROM="Party Hub <noreply@yourdomain.com>"  # Must match your domain
+    export BASE_URL="https://your-domain.com"        # Base URL for invitation links
+    ```
 
-**Note**: To force direct SMTP mode even when client credentials are available, set `MAIL_SENDTYPE=direct`. Otherwise, if SMTP client credentials are not configured, Party Hub will automatically use direct SMTP sending.
+    **Note**: To force direct SMTP mode even when client credentials are available, set `MAIL_SENDTYPE=direct`. Otherwise, if SMTP client credentials are not configured, Party Hub will automatically use direct SMTP sending.
 
 2. **DNS Configuration for Direct SMTP**:
 
-To ensure your emails aren't marked as spam, you must configure these DNS records for your domain:
+    To ensure your emails aren't marked as spam, you must configure these DNS records for your domain:
 
-**SPF Record** (Sender Policy Framework):
-```
-Type: TXT
-Name: @
-Value: v=spf1 ip4:YOUR_SERVER_IP -all
-```
+    **SPF Record** (Sender Policy Framework):
 
-Replace `YOUR_SERVER_IP` with your server's public IP address. This tells email servers that your server is authorized to send email for your domain.
+    ```txt
+    Type: TXT
+    Name: @
+    Value: v=spf1 ip4:YOUR_SERVER_IP -all
+    ```
 
-**DKIM Record** (DomainKeys Identified Mail):
-DKIM signing is more complex and requires generating a private/public key pair. Consider using a service like [EasyDMARC](https://easydmarc.com/tools/dkim-record-generator) to generate your DKIM keys and records.
+    Replace `YOUR_SERVER_IP` with your server's public IP address. This tells email servers that your server is authorized to send email for your domain.
 
-**DMARC Record** (Domain-based Message Authentication):
-```
-Type: TXT
-Name: _dmarc
-Value: v=DMARC1; p=quarantine; rua=mailto:postmaster@yourdomain.com
-```
+    **DKIM Record** (DomainKeys Identified Mail):
+    DKIM signing is more complex and requires generating a private/public key pair. Consider using a service like [EasyDMARC](https://easydmarc.com/tools/dkim-record-generator) to generate your DKIM keys and records.
 
-This tells receiving servers to quarantine emails that fail SPF/DKIM checks and send reports to your postmaster address.
+    **DMARC Record** (Domain-based Message Authentication):
 
-**Example complete DNS setup**:
-```
-# SPF - Authorize your server's IP
-@ IN TXT "v=spf1 ip4:203.0.113.10 -all"
+    ```txt
+    Type: TXT
+    Name: _dmarc
+    Value: v=DMARC1; p=quarantine; rua=mailto:postmaster@yourdomain.com
+    ```
 
-# DMARC - Set policy and reporting
-_dmarc IN TXT "v=DMARC1; p=quarantine; rua=mailto:postmaster@yourdomain.com"
+    This tells receiving servers to quarantine emails that fail SPF/DKIM checks and send reports to your postmaster address.
 
-# DKIM - Public key for verification (generated separately)
-default._domainkey IN TXT "v=DKIM1; k=rsa; p=YOUR_PUBLIC_KEY_HERE"
-```
+    **Example complete DNS setup**:
 
-**Important Notes**:
-- DNS changes can take hours or days to propagate
-- Test your configuration with [mail-tester.com](https://www.mail-tester.com/)
-- Without proper SPF/DKIM/DMARC, your emails will likely end up in spam
-- Major email providers (Gmail, Outlook) require DKIM for good deliverability
-- Consider using Option 1 (SMTP Client) if DNS configuration is too complex
+    ```txt
+    # SPF - Authorize your server's IP
+    @ IN TXT "v=spf1 ip4:203.0.113.10 -all"
 
-3. **Testing email**:
+    # DMARC - Set policy and reporting
+    _dmarc IN TXT "v=DMARC1; p=quarantine; rua=mailto:postmaster@yourdomain.com"
 
-```bash
-# Test with SMTP Client
-export SMTP_SERVER="smtp.gmail.com"
-export SMTP_USERNAME="test@gmail.com"
-export SMTP_PASSWORD="your-app-password"
-export SMTP_FROM="Party Hub <noreply@example.com>"
-export MAIL_SENDTYPE="client"  # Optional: force client mode
-cargo run
+    # DKIM - Public key for verification (generated separately)
+    default._domainkey IN TXT "v=DKIM1; k=rsa; p=YOUR_PUBLIC_KEY_HERE"
+    ```
 
-# Test with Direct SMTP (no credentials needed)
-unset SMTP_SERVER SMTP_USERNAME SMTP_PASSWORD
-export SMTP_FROM="Party Hub <noreply@yourdomain.com>"
-export BASE_URL="https://your-domain.com"
-export MAIL_SENDTYPE="direct"  # Optional: force direct mode
-cargo run
-
-# Add a guest and invite them to see email in action
-```
-
-**Note**: 
-- Use `MAIL_SENDTYPE` to explicitly choose between `client` or `direct` email methods
-- If `MAIL_SENDTYPE` is not set, Party Hub automatically detects and uses the configured method (prefers client over direct)
-- If no email method is configured, Party Hub will log a warning at startup and continue without email notifications
-- Push notifications will always work regardless of email configuration
+    **Important Notes**:
+    - DNS changes can take hours or days to propagate
+    - Test your configuration with [mail-tester.com](https://www.mail-tester.com/)
+    - Without proper SPF/DKIM/DMARC, your emails will likely end up in spam
+    - Major email providers (Gmail, Outlook) require DKIM for good deliverability
+    - Consider using Option 1 (SMTP Client) if DNS configuration is too complex
 
 ## License
 
