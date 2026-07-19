@@ -13,13 +13,13 @@ use std::fs;
 use time::{Duration, OffsetDateTime};
 
 #[get("")]
-async fn auth(req: actix_web::HttpRequest) -> impl Responder {
+async fn auth(req: actix_web::HttpRequest, config: web::Data<AppConfig>) -> impl Responder {
     // Detect language from Accept-Language header
     let language = detect_language(&req);
 
     let filename = match language.as_str() {
-        "de" => "pages/de/auth_de.html",
-        _ => "pages/en/auth_en.html", // Default to English
+        "de" => config.page_path("de/auth_de.html"),
+        _ => config.page_path("en/auth_en.html"), // Default to English
     };
 
     let html_content =

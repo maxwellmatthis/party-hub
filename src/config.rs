@@ -82,4 +82,23 @@ impl AppConfig {
     pub fn smtp_direct_configured(&self) -> bool {
         self.smtp_from.is_some()
     }
+
+    pub fn page_path(&self, relative_path: &str) -> String {
+        join_path(&self.web_assets_path, "pages", relative_path)
+    }
+
+    pub fn static_path(&self, relative_path: &str) -> String {
+        join_path(&self.web_assets_path, "static", relative_path)
+    }
+}
+
+fn join_path(base_path: &str, directory: &str, relative_path: &str) -> String {
+    let base_path = base_path.trim_end_matches('/');
+    let relative_path = relative_path.trim_start_matches('/');
+
+    if base_path.is_empty() {
+        format!("/{}/{}", directory, relative_path)
+    } else {
+        format!("{}/{}/{}", base_path, directory, relative_path)
+    }
 }

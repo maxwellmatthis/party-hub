@@ -13,13 +13,14 @@ use uuid::Uuid;
 #[get("/")]
 pub async fn home(
     req: actix_web::HttpRequest,
+    config: web::Data<AppConfig>,
 ) -> impl Responder {
     // Detect language from Accept-Language header
     let language = detect_language(&req);
 
     let filename = match language.as_str() {
-        "de" => "pages/de/index_de.html",
-        _ => "pages/en/index_en.html", // Default to English
+        "de" => config.page_path("de/index_de.html"),
+        _ => config.page_path("en/index_en.html"), // Default to English
     };
 
     let html_content =
@@ -33,6 +34,7 @@ pub async fn home(
 pub async fn dashboard(
     req: actix_web::HttpRequest,
     db: web::Data<Pool<SqliteConnectionManager>>,
+    config: web::Data<AppConfig>,
 ) -> impl Responder {
     // Check if user is authenticated
     if is_authenticated_as_author(&req, &db).is_none() {
@@ -46,8 +48,8 @@ pub async fn dashboard(
     let language = detect_language(&req);
 
     let filename = match language.as_str() {
-        "de" => "pages/de/manage_de.html",
-        _ => "pages/en/manage_en.html", // Default to English
+        "de" => config.page_path("de/manage_de.html"),
+        _ => config.page_path("en/manage_en.html"), // Default to English
     };
 
     let html_content =

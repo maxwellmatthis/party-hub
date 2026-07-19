@@ -85,7 +85,7 @@ else
     trap 'rm -f "${key_file:-}"' EXIT
     chmod 600 "${key_file}"
 
-    npx web-push generate-vapid-keys --json > "${key_file}"
+    npx --yes web-push generate-vapid-keys --json > "${key_file}"
 
     # Confirm that both values exist before installing either file.
     jq -e '

@@ -58,6 +58,7 @@ pub async fn invitation_page(
     path: web::Path<String>,
     req: actix_web::HttpRequest,
     db: web::Data<Pool<SqliteConnectionManager>>,
+    config: web::Data<AppConfig>,
 ) -> impl Responder {
     let id = path.into_inner();
 
@@ -82,8 +83,8 @@ pub async fn invitation_page(
         // This is a public party - serve the invitation page for anonymous viewing
         let language = detect_language(&req);
         let filename = match language.as_str() {
-            "de" => "pages/de/invitation_de.html",
-            _ => "pages/en/invitation_en.html",
+            "de" => config.page_path("de/invitation_de.html"),
+            _ => config.page_path("en/invitation_en.html"),
         };
 
         let html_content = fs::read_to_string(filename)
@@ -107,8 +108,8 @@ pub async fn invitation_page(
     if !invitation_exists {
         let language = detect_language(&req);
         let filename = match language.as_str() {
-            "de" => "pages/de/not_found_de.html",
-            _ => "pages/en/not_found_en.html",
+            "de" => config.page_path("de/not_found_de.html"),
+            _ => config.page_path("en/not_found_en.html"),
         };
         let html_content =
             fs::read_to_string(filename).unwrap_or_else(|_| "<h1>404: Not Found</h1>".to_string());
@@ -121,8 +122,8 @@ pub async fn invitation_page(
     let language = detect_language(&req);
 
     let filename = match language.as_str() {
-        "de" => "pages/de/invitation_de.html",
-        _ => "pages/en/invitation_en.html", // Default to English
+        "de" => config.page_path("de/invitation_de.html"),
+        _ => config.page_path("en/invitation_en.html"), // Default to English
     };
 
     let html_content =
@@ -711,11 +712,11 @@ async fn save_answers(
 }
 
 #[get("/register")]
-pub async fn register(req: actix_web::HttpRequest) -> impl Responder {
+pub async fn register(req: actix_web::HttpRequest, config: web::Data<AppConfig>) -> impl Responder {
     let language = detect_language(&req);
     let filename = match language.as_str() {
-        "de" => "pages/de/public_guest_de.html",
-        _ => "pages/en/public_guest_en.html",
+        "de" => config.page_path("de/public_guest_de.html"),
+        _ => config.page_path("en/public_guest_en.html"),
     };
 
     let html_content =

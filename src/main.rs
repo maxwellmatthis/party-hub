@@ -18,13 +18,12 @@ async fn serve_static(
     config: web::Data<AppConfig>,
 ) -> actix_web::Result<NamedFile> {
     let filename = path.into_inner();
-    let file_path = format!("{}/static/{}", config.web_assets_path, filename);
-    Ok(NamedFile::open(file_path)?)
+    Ok(NamedFile::open(config.static_path(&filename))?)
 }
 
 #[get("/web-push-service-worker.js")]
 async fn serve_service_worker(config: web::Data<AppConfig>) -> HttpResponse {
-    let file_path = format!("{}/static/web-push-service-worker.js", config.web_assets_path);
+    let file_path = config.static_path("web-push-service-worker.js");
 
     let file_content = match fs::read(file_path) {
         Ok(content) => content,
@@ -39,12 +38,12 @@ async fn serve_service_worker(config: web::Data<AppConfig>) -> HttpResponse {
 
 #[get("/favicon.ico")]
 async fn serve_favicon(config: web::Data<AppConfig>) -> actix_web::Result<NamedFile> {
-    Ok(NamedFile::open(format!("{}/static/logo/favicon.ico", config.web_assets_path))?)
+    Ok(NamedFile::open(config.static_path("logo/favicon.ico"))?)
 }
 
 #[get("/manifest.json")]
 async fn serve_manifest(config: web::Data<AppConfig>) -> actix_web::Result<NamedFile> {
-    Ok(NamedFile::open(format!("{}/static/manifest.json", config.web_assets_path))?)
+    Ok(NamedFile::open(config.static_path("manifest.json"))?)
 }
 
 fn detect_language(req: &actix_web::HttpRequest) -> String {
