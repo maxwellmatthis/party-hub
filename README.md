@@ -115,9 +115,9 @@ The installer provisions the following paths for a production deployment:
 | /etc/party-hub/private_vapid_key.pem | Private VAPID key used for web push notifications | 640, root:party-hub |
 | /var/lib/party-hub/ | Data directory for persistent application state | 750, party-hub:party-hub |
 | /var/lib/party-hub/party.db | SQLite database file | 640, party-hub:party-hub |
-| /var/www/assets/ | Root directory for served web assets | 750, party-hub:party-hub |
-| /var/www/assets/pages/ | Rendered HTML pages served by the app | 750, party-hub:party-hub |
-| /var/www/assets/static/ | CSS, JavaScript, images, and other static files | 750, party-hub:party-hub |
+| /var/www/party-hub/assets/ | Root directory for served web assets | 750, party-hub:party-hub |
+| /var/www/party-hub/assets/pages/ | Rendered HTML pages served by the app | 750, party-hub:party-hub |
+| /var/www/party-hub/assets/static/ | CSS, JavaScript, images, and other static files | 750, party-hub:party-hub |
 | /usr/local/bin/party-hub | Installed application binary | 755, root:root |
 
 ## Environment Variables

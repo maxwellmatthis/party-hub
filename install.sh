@@ -16,7 +16,7 @@ set -Eeuo pipefail
 SERVICE_USER="party-hub"
 CONFIG_DIR="/etc/party-hub"
 DATA_DIR="/var/lib/party-hub"
-ASSET_DIR="/var/www/assets"
+ASSET_DIR="/var/www/party-hub/assets"
 BINARY_PATH="/usr/local/bin/party-hub"
 SERVICE_PATH="/etc/systemd/system/party-hub.service"
 
