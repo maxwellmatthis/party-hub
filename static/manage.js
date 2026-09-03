@@ -47,6 +47,9 @@ let currentPartyId = null;
 let allGuests = [];
 let currentPartyGuests = [];
 let hasRsvpBlock = false;
+let activePartyId = null;
+let activePartyGuests = [];
+let secretSantaManagementInitialized = false;
 
 let blockOrder = [];
 
@@ -123,6 +126,10 @@ function createInvitationBlock(blockId, blockData = {}) {
     typeSelect.addEventListener('change', (e) => {
         updateBlockVisibility(blockDiv, e.target.value);
         updateAttendanceAvailability();
+        updateSecretSantaVisibility();
+        if (e.target.value === 'secret_santa' && !secretSantaManagementInitialized && activePartyId) {
+            setupSecretSanta(activePartyId, document, activePartyGuests, [{ template: 'secret_santa' }]);
+        }
     });
 
     const deleteBtn = blockElement.querySelector('.block-delete');
@@ -139,6 +146,7 @@ function updateBlockVisibility(blockDiv, blockType) {
     const attendanceOptionsDiv = blockDiv.querySelector('.attendance-options');
     const visibilitySelect = blockDiv.querySelector('select[name="visibility"]');
     const contentTextarea = blockDiv.querySelector('textarea');
+    const secretSantaPreview = blockDiv.querySelector('.secret-santa-preview');
 
     // Show attendance options only for attendance type
     if (attendanceOptionsDiv) {
@@ -154,8 +162,19 @@ function updateBlockVisibility(blockDiv, blockType) {
     
     // Hide textarea for calendar block (it doesn't need content)
     if (contentTextarea) {
-        contentTextarea.style.display = blockType === 'calendar' ? 'none' : 'block';
+        contentTextarea.style.display = ['calendar', 'secret_santa'].includes(blockType) ? 'none' : 'block';
     }
+    if (secretSantaPreview) {
+        secretSantaPreview.style.display = blockType === 'secret_santa' ? 'block' : 'none';
+    }
+}
+
+function updateSecretSantaVisibility() {
+    const management = document.querySelector('#secret-santa-management');
+    if (!management) return;
+    const enabled = Array.from(document.querySelectorAll('.block-type-select'))
+        .some(select => select.value === 'secret_santa');
+    management.style.display = enabled ? '' : 'none';
 }
 
 function updateAttendanceAvailability() {
@@ -280,6 +299,11 @@ function getBlockData(blockElement) {
             template: template,
             content: JSON.stringify(questionData)
         };
+    } else if (template === 'secret_santa') {
+        return {
+            template: template,
+            content: JSON.stringify({ label: 'Secret Santa' })
+        };
     } else {
         return {
             template: template,
@@ -344,11 +368,94 @@ function reorderBlocks(draggedBlockId, targetBlockId) {
     showToast('Block moved', 'success');
 }
 
+async function setupSecretSanta(partyId, fragment, guests, blocks) {
+    const management = fragment.querySelector('#secret-santa-management');
+    const status = fragment.querySelector('#secret-santa-status');
+    const container = fragment.querySelector('#secret-santa-assignments');
+    const shuffleButton = fragment.querySelector('#shuffle-secret-santa-btn');
+    const enabled = blocks.some(block => block.template === 'secret_santa');
+    if (!enabled) {
+        management.style.display = 'none';
+        return;
+    }
+    secretSantaManagementInitialized = true;
+    const load = async () => {
+        const response = await fetch(`/party/${partyId}/secret-santa`);
+        if (!response.ok) throw new Error('Failed to load assignments');
+        const assignments = await response.json();
+        container.innerHTML = '';
+        assignments.forEach(assignment => {
+            const row = document.createElement('div');
+            row.className = 'secret-santa-assignment';
+            const giver = document.createElement('label');
+            giver.textContent = assignment.giver_name;
+            const details = document.createElement('div');
+            details.className = 'secret-santa-assignment-details';
+            const select = document.createElement('select');
+            const unassigned = document.createElement('option');
+            unassigned.value = '';
+            unassigned.textContent = 'Not assigned';
+            select.appendChild(unassigned);
+            guests.forEach(guest => {
+                const option = document.createElement('option');
+                option.value = guest.id;
+                option.textContent = guest.name || `${guest.first} ${guest.last}`.trim();
+                select.appendChild(option);
+            });
+            select.value = assignment.receiver_id || '';
+            details.append(select);
+            details.hidden = true;
+            const show = document.createElement('button');
+            show.type = 'button';
+            show.title = 'Show assignment';
+            show.setAttribute('aria-label', 'Show assignment');
+            const showIcon = document.createElement('img');
+            showIcon.src = '/static/eye-off.svg';
+            showIcon.alt = 'Show assignment';
+            show.appendChild(showIcon);
+            show.addEventListener('click', () => {
+                details.hidden = !details.hidden;
+                showIcon.src = details.hidden ? '/static/eye-off.svg' : '/static/eye.svg';
+                show.title = details.hidden ? 'Show assignment' : 'Hide assignment';
+                show.setAttribute('aria-label', details.hidden ? 'Show assignment' : 'Hide assignment');
+            });
+            const save = document.createElement('button');
+            save.type = 'button';
+            save.title = 'Save assignment';
+            save.setAttribute('aria-label', 'Save assignment');
+            const saveIcon = document.createElement('img');
+            saveIcon.src = '/static/save.svg';
+            saveIcon.alt = 'Save assignment';
+            save.appendChild(saveIcon);
+            row.append(giver, details, show, save);
+            save.addEventListener('click', async () => {
+                const save = await fetch(`/party/${partyId}/secret-santa/assignment`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({giver_id: assignment.giver_id, receiver_id: select.value})
+                });
+                if (save.ok) showToast('Assignment saved', 'success');
+                else showToast((await save.json()).error || 'Failed to save assignment', 'error');
+            });
+            container.appendChild(row);
+        });
+        status.textContent = '';
+    };
+    shuffleButton.addEventListener('click', async () => {
+        const response = await fetch(`/party/${partyId}/secret-santa/shuffle`, {method: 'POST'});
+        if (response.ok) { showToast('Assignments shuffled', 'success'); await load(); }
+        else showToast((await response.json()).error || 'Failed to shuffle assignments', 'error');
+    });
+    try { await load(); } catch (_) { status.textContent = 'Failed to load assignments.'; }
+}
+
 async function renderParty(partyId) {
     try {
         const response = await fetch(`/party/${partyId}`);
         if (!response.ok) throw new Error('Failed to load party');
         const partyDetails = await response.json();
+        activePartyId = partyId;
+        activePartyGuests = partyDetails.guests;
+        secretSantaManagementInitialized = false;
 
         main.innerHTML = "";
         const p = templateEditParty.content.cloneNode(true);
@@ -516,6 +623,7 @@ async function renderParty(partyId) {
         initializeBlockEditor(invitationBlocksContainer, invitationBlocks);
 
         main.appendChild(p);
+        await setupSecretSanta(partyId, main, partyDetails.guests, invitationBlocks);
     } catch (error) {
         console.error('Error rendering party:', error);
         main.innerHTML = "";
@@ -673,6 +781,9 @@ function setupGuestSearch() {
 
 async function addGuestToParty(guestId, guestName) {
     try {
+        if (document.querySelector('input#party-name-input')) {
+            await saveParty(currentPartyId);
+        }
         const response = await fetch(`/party/${currentPartyId}/add/${guestId}`, {
             method: 'POST',
             credentials: 'same-origin'

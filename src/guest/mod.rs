@@ -144,13 +144,17 @@ async fn delete_guest(
             .prepare("DELETE FROM invitations WHERE guest_id = ?1")
             .and_then(|mut stmt| stmt.execute([&guest_id]));
 
+        let delete_assignments_result = tx
+            .prepare("DELETE FROM secret_santa_assignments WHERE giver_id = ?1 OR receiver_id = ?1")
+            .and_then(|mut stmt| stmt.execute([&guest_id]));
+
         // Delete the guest
         let delete_guest_result = tx
             .prepare("DELETE FROM guests WHERE id = ?1 AND author = ?2")
             .and_then(|mut stmt| stmt.execute([&guest_id, &author_id]));
 
-        match (delete_invitations_result, delete_guest_result) {
-            (Ok(_), Ok(rows_affected)) => {
+        match (delete_invitations_result, delete_assignments_result, delete_guest_result) {
+            (Ok(_), Ok(_), Ok(rows_affected)) => {
                 if rows_affected > 0 {
                     tx.commit().unwrap();
                     HttpResponse::Ok().json(json!({

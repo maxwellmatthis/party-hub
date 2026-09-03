@@ -8,7 +8,7 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/static/logo/favicon-16.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/static/logo/favicon-32.png">
     <link rel="icon" type="image/x-icon" href="/static/logo/favicon.ico">
-    <script src="/static/manage.js" defer></script>
+    <script src="/static/manage.js?v=20260903-10" defer></script>
     <link rel="stylesheet" href="/static/manage.css">
 
     <!-- Templates -->
@@ -102,6 +102,14 @@
                 <!-- template#guest -->
             </div>
         </section>
+        <section id="secret-santa-management">
+            <div class="section-header">
+                <h3>Wichtel-Zuordnungen</h3>
+                <button id="shuffle-secret-santa-btn" class="btn" type="button">Jetzt mischen</button>
+            </div>
+            <p id="secret-santa-status">Füge einen Wichtel-Block hinzu, um Zuordnungen zu aktivieren.</p>
+            <div id="secret-santa-assignments"></div>
+        </section>
     </template>
     <template id="guest">
         <div class="guest-item">
@@ -140,6 +148,7 @@
                     <option value="p">Absatz</option>
                     <option value="code">Code</option>
                     <option value="attendance">Teilnahme</option>
+                    <option value="secret_santa">Wichteln</option>
                     <option value="single_choice">Einzelauswahl-Frage</option>
                     <option value="multiple_choice">Mehrfachauswahl-Frage</option>
                     <option value="text_input">Text-Frage</option>
@@ -147,6 +156,7 @@
                     <option value="calendar">Zum Kalender hinzufügen</option>
                 </select>
                 <textarea name="text" id="content-or-label" placeholder="Inhalt oder Frage eingeben..."></textarea>
+                <div class="secret-santa-preview">Deine Wichtel-Zuordnung: &lt;Name&gt;</div>
                 <input type="text" id="options" placeholder="Option 1; Option 2; Option 3..." style="display: none;">
                 <div class="attendance-options" style="display: none;">
                     <label>Option 1: <input type="text" class="attendance-option-1" placeholder="Ja"></label>

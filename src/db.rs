@@ -216,5 +216,18 @@ pub fn prepare_db() -> Result<()> {
         (),
     )?;
 
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS secret_santa_assignments (
+            party_id TEXT NOT NULL,
+            giver_id TEXT NOT NULL,
+            receiver_id TEXT NOT NULL,
+            PRIMARY KEY (party_id, giver_id),
+            FOREIGN KEY (party_id) REFERENCES parties(id),
+            FOREIGN KEY (giver_id) REFERENCES guests(id),
+            FOREIGN KEY (receiver_id) REFERENCES guests(id)
+        )",
+        (),
+    )?;
+
     Ok(())
 }

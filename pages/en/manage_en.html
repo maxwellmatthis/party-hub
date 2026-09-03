@@ -8,7 +8,7 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/static/logo/favicon-16.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/static/logo/favicon-32.png">
     <link rel="icon" type="image/x-icon" href="/static/logo/favicon.ico">
-    <script src="/static/manage.js" defer></script>
+    <script src="/static/manage.js?v=20260903-10" defer></script>
     <link rel="stylesheet" href="/static/manage.css">
 
     <!-- Templates -->
@@ -102,6 +102,14 @@
                 <!-- template#guest -->
             </div>
         </section>
+        <section id="secret-santa-management">
+            <div class="section-header">
+                <h3>Secret Santa Assignments</h3>
+                <button id="shuffle-secret-santa-btn" class="btn" type="button">Shuffle Now</button>
+            </div>
+            <p id="secret-santa-status">Add a Secret Santa block to this party to enable assignments.</p>
+            <div id="secret-santa-assignments"></div>
+        </section>
     </template>
     <template id="guest">
         <div class="guest-item">
@@ -140,6 +148,7 @@
                     <option value="p">Paragraph</option>
                     <option value="code">Code</option>
                     <option value="attendance">Attendance</option>
+                    <option value="secret_santa">Secret Santa</option>
                     <option value="single_choice">Single Choice Question</option>
                     <option value="multiple_choice">Multiple Choice Question</option>
                     <option value="text_input">Text Question</option>
@@ -147,6 +156,7 @@
                     <option value="calendar">Add to Calendar</option>
                 </select>
                 <textarea name="text" id="content-or-label" placeholder="Enter content or question..."></textarea>
+                <div class="secret-santa-preview">Your Secret Santa assignment: &lt;name&gt;</div>
                 <input type="text" id="options" placeholder="Option 1; Option 2; Option 3..." style="display: none;">
                 <div class="attendance-options" style="display: none;">
                     <label>Option 1: <input type="text" class="attendance-option-1" placeholder="Yes"></label>

@@ -692,6 +692,123 @@ aside section.collapsed div#guests {
     }
 }
 
+.secret-santa-preview {
+    display: none;
+    padding: 10px 12px;
+    border: 1px solid #e1e5e9;
+    border-radius: 4px;
+    background: #fff;
+    color: #555;
+}
+
+.secret-santa-assignment {
+    background: white;
+    border: 2px solid #e1e5e9;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.secret-santa-assignment:hover {
+    border-color: #667eea;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+    transform: translateY(-1px);
+}
+
+.secret-santa-assignment > label {
+    flex: 1;
+    margin: 0;
+    font-size: 1.1em;
+    font-weight: 500;
+    color: #333;
+}
+
+.secret-santa-assignment-details {
+    flex-basis: 100%;
+    order: 3;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #e1e5e9;
+}
+
+.secret-santa-assignment-details[hidden] {
+    display: none;
+}
+
+.secret-santa-assignment-details span {
+    color: #555;
+}
+
+.secret-santa-assignment-details select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    background: white;
+    color: #333;
+    font: inherit;
+}
+
+.secret-santa-assignment button {
+    background: white;
+    border: 2px solid #e1e5e9;
+    border-radius: 6px;
+    padding: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.secret-santa-assignment button img {
+    width: 16px;
+    height: 16px;
+    transition: filter 0.2s ease;
+}
+
+.secret-santa-assignment button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.secret-santa-assignment > button:first-of-type {
+    border-color: #28a745;
+}
+
+.secret-santa-assignment > button:first-of-type:hover {
+    background: #28a745;
+    border-color: #28a745;
+}
+
+.secret-santa-assignment > button:first-of-type:hover img {
+    filter: brightness(0) invert(1);
+}
+
+.secret-santa-assignment > button:last-of-type {
+    border-color: #6c757d;
+    margin-left: 8px;
+}
+
+.secret-santa-assignment > button:last-of-type:hover {
+    background: #6c757d;
+    border-color: #6c757d;
+}
+
+.secret-santa-assignment > button:last-of-type:hover img {
+    filter: brightness(0) invert(1);
+}
+
 /* Form Elements */
 label {
     display: block;

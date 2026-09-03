@@ -418,6 +418,21 @@ async fn details(
             .collect()
     };
 
+    let secret_santa_assignment = conn
+        .prepare(
+            "SELECT g.first, g.last FROM secret_santa_assignments a
+             JOIN guests g ON g.id = a.receiver_id
+             WHERE a.party_id = ?1 AND a.giver_id = ?2",
+        )
+        .and_then(|mut stmt| {
+            stmt.query_row([&invitation.party_id, &invitation.guest_id], |row| {
+                let first: String = row.get(0)?;
+                let last: String = row.get(1)?;
+                Ok(format!("{} {}", first, last).trim().to_string())
+            })
+        })
+        .ok();
+
     let response = json!({
         "invitation_blocks": serde_json::from_str::<serde_json::Value>(&invitation_blocks).unwrap_or(json!([])),
         "invitation_block_answers": invitation.get_answers_json(),
@@ -432,6 +447,7 @@ async fn details(
         "party_time": formatted_time,
         "author_name": author_name,
         "is_organizer": invitation.organizer,
+        "secret_santa_assignment": secret_santa_assignment,
         "is_public_view": false,
     });
 

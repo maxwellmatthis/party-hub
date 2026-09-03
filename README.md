@@ -53,6 +53,7 @@ A modern, minimalistic party invitation platform built with Rust (Actix Web), SQ
   - `{{last}}` - Guest's last name
   - `{{name}}` - Full name (first + last) for backward compatibility
 - 🔐 **Secure Authentication**: Token-based authentication for party organizers
+- 🎅 **Secret Santa**: Automatically assign each guest to another guest.
 
 ## Quick Start
 

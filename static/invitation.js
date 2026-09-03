@@ -111,6 +111,7 @@ class InvitationView {
             text_input: document.querySelector("template#text-input"),
             number_input: document.querySelector("template#number-input"),
             calendar: document.querySelector("template#calendar"),
+            secret_santa: document.querySelector("template#secret-santa"),
             public_stats: document.querySelector("template#public-stats"),
             response_item: document.querySelector("template#response-item"),
             status_saving: document.querySelector("template#status-saving"),
@@ -138,7 +139,7 @@ class InvitationView {
         return content;
     }
 
-    render(invitation_blocks, invitation_block_answers, other_guests_answers, guestData, isOrganizer, onInputChange) {
+    render(invitation_blocks, invitation_block_answers, other_guests_answers, guestData, isOrganizer, secretSantaAssignment, onInputChange) {
         if (invitation_blocks.length < 1) return;
         this.invitation_section.innerHTML = "";
         invitation_blocks.forEach((block, i) => {
@@ -146,12 +147,12 @@ class InvitationView {
             const answer = invitation_block_answers.hasOwnProperty(blockId) ? invitation_block_answers[blockId] : null;
             const div = document.createElement("div");
             div.classList.add("block");
-            div.appendChild(this.createBlock(block.template, block.content, answer, blockId, other_guests_answers, guestData, isOrganizer, onInputChange));
+            div.appendChild(this.createBlock(block.template, block.content, answer, blockId, other_guests_answers, guestData, isOrganizer, secretSantaAssignment, onInputChange));
             this.invitation_section.appendChild(div);
         });
     }
 
-    createBlock(template, content, answer_data, blockId, other_guests_answers, guestData, isOrganizer, onInputChange) {
+    createBlock(template, content, answer_data, blockId, other_guests_answers, guestData, isOrganizer, secretSantaAssignment, onInputChange) {
         if (['h1', 'h2', 'h3', 'p', 'code'].includes(template)) {
             const el = document.createElement(template);
             el.textContent = this.personalizeContent(content, guestData);
@@ -170,10 +171,25 @@ class InvitationView {
                     return this.createNumberInput(content, answer_data, blockId, other_guests_answers, guestData, isOrganizer, onInputChange);
                 case 'calendar':
                     return this.createCalendar();
+                case 'secret_santa':
+                    return this.createSecretSanta(content, guestData, secretSantaAssignment);
                 default:
                     return this.templates.error.content.cloneNode(true);
             }
         }
+    }
+
+    createSecretSanta(content, guestData, assignment) {
+        const block = document.createElement('p');
+        block.className = 'secret-santa-assignment-text';
+        const prefix = document.documentElement.lang === 'de'
+            ? 'Deine Wichtel-Zuordnung'
+            : 'Your Secret Santa assignment';
+        const missing = document.documentElement.lang === 'de'
+            ? 'Noch nicht zugeordnet'
+            : 'Not assigned yet';
+        block.textContent = `${prefix}: ${assignment || missing}`;
+        return block;
     }
 
     createMultipleChoice(content, answer_data, blockId, other_guests_answers, guestData, isOrganizer, onInputChange) {
@@ -817,6 +833,7 @@ class InvitationController {
             data.other_guests_answers || [],
             this.model.getGuestData(), // Pass guest data object for personalization
             data.is_organizer || false, // Pass organizer status to view
+            data.secret_santa_assignment,
             (blockId, value) => this.model.setAnswer(blockId, value)
         );
     }

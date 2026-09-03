@@ -457,13 +457,17 @@ async fn delete_party(
                     .prepare("DELETE FROM invitations WHERE party_id = ?1")
                     .and_then(|mut stmt| stmt.execute([&party_id]));
 
+                let delete_assignments_result = tx
+                    .prepare("DELETE FROM secret_santa_assignments WHERE party_id = ?1")
+                    .and_then(|mut stmt| stmt.execute([&party_id]));
+
                 // Delete the party
                 let delete_party_result = tx
                     .prepare("DELETE FROM parties WHERE id = ?1 AND author = ?2")
                     .and_then(|mut stmt| stmt.execute([&party_id, &author_id]));
 
-                match (delete_invitations_result, delete_party_result) {
-                    (Ok(_), Ok(rows_affected)) => {
+                match (delete_invitations_result, delete_assignments_result, delete_party_result) {
+                    (Ok(_), Ok(_), Ok(rows_affected)) => {
                         if rows_affected > 0 {
                             tx.commit().unwrap();
                             HttpResponse::Ok().json(json!({
@@ -636,24 +640,31 @@ async fn remove_guest_from_party(
         match verify_party_ownership(&pool, &party_id, &author_id) {
             Ok(true) => {
                 let conn = pool.get().unwrap();
-                // Remove invitation
-                let result = conn
+                let tx = conn.unchecked_transaction().unwrap();
+                let result = tx
                     .prepare("DELETE FROM invitations WHERE guest_id = ?1 AND party_id = ?2")
                     .and_then(|mut stmt| stmt.execute([&guest_id, &party_id]));
+                let assignment_result = tx
+                    .prepare("DELETE FROM secret_santa_assignments WHERE party_id = ?1 AND (giver_id = ?2 OR receiver_id = ?2)")
+                    .and_then(|mut stmt| stmt.execute([&party_id, &guest_id]));
 
-                match result {
-                    Ok(rows_affected) => {
+                match (result, assignment_result) {
+                    (Ok(rows_affected), Ok(_)) => {
                         if rows_affected > 0 {
+                            tx.commit().unwrap();
                             HttpResponse::Ok().json(
                                 json!({"status": "success", "message": "Guest removed from party"}),
                             )
                         } else {
+                            tx.rollback().unwrap();
                             HttpResponse::NotFound()
                                 .json(json!({"error": "Guest invitation not found"}))
                         }
                     }
-                    Err(_) => HttpResponse::InternalServerError()
-                        .json(json!({"error": "Failed to remove guest from party"})),
+                    _ => {
+                        tx.rollback().unwrap();
+                        HttpResponse::InternalServerError().json(json!({"error": "Failed to remove guest from party"}))
+                    }
                 }
             }
             Ok(false) => {
@@ -750,6 +761,127 @@ async fn demote_organizer_to_guest(
     }
 }
 
+#[get("/{party_id}/secret-santa")]
+async fn get_secret_santa_assignments(
+    path: web::Path<String>,
+    pool: web::Data<Pool<SqliteConnectionManager>>,
+    req: HttpRequest,
+) -> impl Responder {
+    let party_id = path.into_inner();
+    let author_id = match is_authenticated_as_author(&req, &pool) {
+        Some(id) => id,
+        None => return HttpResponse::Unauthorized().json(json!({"error": "Authentication required"})),
+    };
+    match verify_party_ownership(&pool, &party_id, &author_id) {
+        Ok(true) => {
+            let conn = pool.get().unwrap();
+            let result = conn.prepare(
+                "SELECT giver.id, giver.first, giver.last, a.receiver_id, receiver.first, receiver.last
+                 FROM invitations i
+                 JOIN guests giver ON giver.id = i.guest_id
+                 LEFT JOIN secret_santa_assignments a ON a.party_id = i.party_id AND a.giver_id = giver.id
+                 LEFT JOIN guests receiver ON receiver.id = a.receiver_id
+                 WHERE i.party_id = ?1 ORDER BY giver.last, giver.first"
+            ).and_then(|mut stmt| {
+                let rows = stmt.query_map([&party_id], |row| Ok(json!({
+                    "giver_id": row.get::<_, String>(0)?,
+                    "giver_name": format!("{} {}", row.get::<_, String>(1)?, row.get::<_, String>(2)?).trim().to_string(),
+                    "receiver_id": row.get::<_, Option<String>>(3)?,
+                    "receiver_name": row.get::<_, Option<String>>(4)?.unwrap_or_default() + " " + &row.get::<_, Option<String>>(5)?.unwrap_or_default()
+                })))?.filter_map(|row| row.ok()).collect::<Vec<_>>();
+                Ok(rows)
+            });
+            match result {
+                Ok(assignments) => HttpResponse::Ok().json(assignments),
+                Err(_) => HttpResponse::InternalServerError().json(json!({"error": "Failed to fetch assignments"})),
+            }
+        }
+        Ok(false) => HttpResponse::Forbidden().json(json!({"error": "Party not found or access denied"})),
+        Err(_) => HttpResponse::InternalServerError().json(json!({"error": "Database error"})),
+    }
+}
+
+#[post("/{party_id}/secret-santa/shuffle")]
+async fn shuffle_secret_santa(
+    path: web::Path<String>,
+    pool: web::Data<Pool<SqliteConnectionManager>>,
+    req: HttpRequest,
+) -> impl Responder {
+    let party_id = path.into_inner();
+    let author_id = match is_authenticated_as_author(&req, &pool) {
+        Some(id) => id,
+        None => return HttpResponse::Unauthorized().json(json!({"error": "Authentication required"})),
+    };
+    if !matches!(verify_party_ownership(&pool, &party_id, &author_id), Ok(true)) {
+        return HttpResponse::Forbidden().json(json!({"error": "Party not found or access denied"}));
+    }
+    let conn = pool.get().unwrap();
+    let guests = conn.prepare("SELECT guest_id FROM invitations WHERE party_id = ?1 ORDER BY random()")
+        .and_then(|mut stmt| stmt.query_map([&party_id], |row| row.get::<_, String>(0)).map(|rows| rows.filter_map(|row| row.ok()).collect::<Vec<_>>()));
+    let guests = match guests {
+        Ok(guests) if guests.len() >= 2 => guests,
+        Ok(_) => return HttpResponse::BadRequest().json(json!({"error": "At least two guests are required"})),
+        Err(_) => return HttpResponse::InternalServerError().json(json!({"error": "Failed to fetch guests"})),
+    };
+    let tx = conn.unchecked_transaction().unwrap();
+    if tx.execute("DELETE FROM secret_santa_assignments WHERE party_id = ?1", [&party_id]).is_err() {
+        return HttpResponse::InternalServerError().json(json!({"error": "Failed to clear assignments"}));
+    }
+    for (index, giver_id) in guests.iter().enumerate() {
+        let receiver_id = &guests[(index + 1) % guests.len()];
+        if tx.execute(
+            "INSERT INTO secret_santa_assignments (party_id, giver_id, receiver_id) VALUES (?1, ?2, ?3)",
+            rusqlite::params![&party_id, giver_id, receiver_id]
+        ).is_err() {
+            return HttpResponse::InternalServerError().json(json!({"error": "Failed to create assignments"}));
+        }
+    }
+    tx.commit().unwrap();
+    HttpResponse::Ok().json(json!({"status": "success", "count": guests.len()}))
+}
+
+#[derive(Deserialize)]
+struct SecretSantaAssignmentForm {
+    giver_id: String,
+    receiver_id: String,
+}
+
+#[post("/{party_id}/secret-santa/assignment")]
+async fn update_secret_santa_assignment(
+    path: web::Path<String>,
+    form: web::Json<SecretSantaAssignmentForm>,
+    pool: web::Data<Pool<SqliteConnectionManager>>,
+    req: HttpRequest,
+) -> impl Responder {
+    let party_id = path.into_inner();
+    let author_id = match is_authenticated_as_author(&req, &pool) {
+        Some(id) => id,
+        None => return HttpResponse::Unauthorized().json(json!({"error": "Authentication required"})),
+    };
+    if !matches!(verify_party_ownership(&pool, &party_id, &author_id), Ok(true)) {
+        return HttpResponse::Forbidden().json(json!({"error": "Party not found or access denied"}));
+    }
+    if form.giver_id == form.receiver_id {
+        return HttpResponse::BadRequest().json(json!({"error": "A guest cannot be assigned to themselves"}));
+    }
+    let conn = pool.get().unwrap();
+    let member_count = conn.query_row(
+        "SELECT count(*) FROM invitations WHERE party_id = ?1 AND guest_id IN (?2, ?3)",
+        rusqlite::params![&party_id, &form.giver_id, &form.receiver_id], |row| row.get::<_, i64>(0)
+    ).unwrap_or(0);
+    if member_count != 2 {
+        return HttpResponse::BadRequest().json(json!({"error": "Both guests must belong to this party"}));
+    }
+    match conn.execute(
+        "INSERT INTO secret_santa_assignments (party_id, giver_id, receiver_id) VALUES (?1, ?2, ?3)
+         ON CONFLICT(party_id, giver_id) DO UPDATE SET receiver_id = excluded.receiver_id",
+        rusqlite::params![&party_id, &form.giver_id, &form.receiver_id]
+    ) {
+        Ok(_) => HttpResponse::Ok().json(json!({"status": "success"})),
+        Err(_) => HttpResponse::InternalServerError().json(json!({"error": "Failed to save assignment"})),
+    }
+}
+
 pub fn subroutes() -> Scope {
     web::scope("/party")
         .service(create_party)
@@ -761,4 +893,7 @@ pub fn subroutes() -> Scope {
         .service(remove_guest_from_party)
         .service(promote_guest_to_organizer)
         .service(demote_organizer_to_guest)
+        .service(get_secret_santa_assignments)
+        .service(shuffle_secret_santa)
+        .service(update_secret_santa_assignment)
 }
