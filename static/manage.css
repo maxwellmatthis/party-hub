@@ -701,6 +701,42 @@ aside section.collapsed div#guests {
     color: #555;
 }
 
+.appointment-heatmap-config {
+    display: none;
+    padding: 12px;
+    border: 1px solid #e1e5e9;
+    border-radius: 6px;
+    background: white;
+}
+
+.heatmap-time-range,
+.heatmap-day-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.heatmap-day-row input {
+    flex: 1;
+}
+
+.heatmap-remove-day,
+.heatmap-add-day {
+    padding: 8px 12px;
+    border: 2px solid #6c757d;
+    border-radius: 6px;
+    background: white;
+    color: #333;
+    cursor: pointer;
+    font: inherit;
+}
+
+.heatmap-add-day {
+    border-color: #28a745;
+    color: #218838;
+}
+
 .secret-santa-assignment {
     background: white;
     border: 2px solid #e1e5e9;

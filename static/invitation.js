@@ -112,6 +112,7 @@ class InvitationView {
             number_input: document.querySelector("template#number-input"),
             calendar: document.querySelector("template#calendar"),
             secret_santa: document.querySelector("template#secret-santa"),
+            appointment_heatmap: document.querySelector("template#appointment-heatmap"),
             public_stats: document.querySelector("template#public-stats"),
             response_item: document.querySelector("template#response-item"),
             status_saving: document.querySelector("template#status-saving"),
@@ -173,6 +174,8 @@ class InvitationView {
                     return this.createCalendar();
                 case 'secret_santa':
                     return this.createSecretSanta(content, guestData, secretSantaAssignment);
+                case 'appointment_heatmap':
+                    return this.createAppointmentHeatmap(content, answer_data, blockId, other_guests_answers, guestData, onInputChange);
                 default:
                     return this.templates.error.content.cloneNode(true);
             }
@@ -190,6 +193,108 @@ class InvitationView {
             : 'Not assigned yet';
         block.textContent = `${prefix}: ${assignment || missing}`;
         return block;
+    }
+
+    createAppointmentHeatmap(content, answerData, blockId, otherGuestsAnswers, guestData, onInputChange) {
+        const block = this.templates.appointment_heatmap.content.cloneNode(true);
+        let config;
+        try {
+            config = typeof content === 'string' ? JSON.parse(content || '{}') : content;
+        } catch (_) {
+            config = {};
+        }
+        const days = Array.isArray(config.days) ? config.days.filter(day => day.date) : [];
+        const start = this.timeToMinutes(config.start || '08:00');
+        const end = this.timeToMinutes(config.end || '18:00');
+        const answers = answerData && typeof answerData === 'object' && !Array.isArray(answerData)
+            ? { ...answerData }
+            : {};
+        const otherCounts = {};
+        (otherGuestsAnswers || []).forEach(guestAnswers => {
+            const heatmapAnswer = guestAnswers[blockId]?.answer;
+            if (heatmapAnswer && typeof heatmapAnswer === 'object') {
+                Object.entries(heatmapAnswer).forEach(([slot, available]) => {
+                    if (available) otherCounts[slot] = (otherCounts[slot] || 0) + 1;
+                });
+            }
+        });
+
+        const scroll = block.querySelector('.appointment-heatmap-scroll');
+        const label = typeof config.label === 'string' && config.label.trim()
+            ? config.label
+            : (document.documentElement.lang === 'de' ? 'Termin finden' : 'Find a time');
+        block.querySelector('h3').textContent = this.personalizeContent(label, guestData);
+        if (!days.length || end <= start) {
+            scroll.textContent = 'No appointment times configured yet.';
+            return block;
+        }
+
+        const table = document.createElement('table');
+        table.className = 'appointment-heatmap';
+        table.classList.toggle('wide', days.length > 4);
+        const header = document.createElement('tr');
+        header.appendChild(document.createElement('th'));
+        days.forEach(day => {
+            const cell = document.createElement('th');
+            cell.textContent = day.date;
+            header.appendChild(cell);
+        });
+        const thead = document.createElement('thead');
+        thead.appendChild(header);
+        table.appendChild(thead);
+        const tbody = document.createElement('tbody');
+        const cells = [];
+        for (let minutes = start; minutes < end; minutes += 15) {
+            const row = document.createElement('tr');
+            const time = document.createElement('th');
+            time.textContent = this.minutesToTime(minutes);
+            row.appendChild(time);
+            days.forEach(day => {
+                const slot = `${day.date}T${this.minutesToTime(minutes)}`;
+                const cell = document.createElement('td');
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'appointment-heatmap-cell';
+                button.setAttribute('aria-label', `${day.date} ${this.minutesToTime(minutes)}`);
+                const unavailable = (day.unavailable || []).some(interval => this.intervalContains(interval, minutes));
+                button.disabled = unavailable;
+                button.addEventListener('click', () => {
+                    answers[slot] = !answers[slot];
+                    onInputChange(blockId, answers);
+                    updateCells();
+                });
+                cell.appendChild(button);
+                row.appendChild(cell);
+                cells.push({ button, slot, unavailable });
+            });
+            tbody.appendChild(row);
+        }
+        table.appendChild(tbody);
+        scroll.appendChild(table);
+
+        const updateCells = () => {
+            cells.forEach(({ button, slot, unavailable }) => {
+                button.classList.toggle('selected', !!answers[slot]);
+                button.style.setProperty('--availability', otherCounts[slot] || 0);
+                button.title = unavailable ? 'Unavailable' : `${otherCounts[slot] || 0} other response(s)`;
+            });
+        };
+        updateCells();
+        return block;
+    }
+
+    timeToMinutes(value) {
+        const [hours, minutes] = String(value).split(':').map(Number);
+        return Number.isFinite(hours) && Number.isFinite(minutes) ? hours * 60 + minutes : 0;
+    }
+
+    minutesToTime(minutes) {
+        return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+    }
+
+    intervalContains(interval, minutes) {
+        const parts = String(interval).split('-').map(part => this.timeToMinutes(part.trim()));
+        return parts.length === 2 && minutes >= parts[0] && minutes < parts[1];
     }
 
     createMultipleChoice(content, answer_data, blockId, other_guests_answers, guestData, isOrganizer, onInputChange) {

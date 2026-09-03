@@ -85,14 +85,23 @@ function createInvitationBlock(blockId, blockData = {}) {
 
     const typeSelect = blockElement.querySelector('.block-type-select');
     const contentTextarea = blockElement.querySelector('textarea');
-    const optionsInput = blockElement.querySelector('input[type="text"]');
+    const optionsInput = blockElement.querySelector('#options');
     const attendanceOptionsDiv = blockElement.querySelector('.attendance-options');
     const attendanceOption1 = blockElement.querySelector('.attendance-option-1');
     const attendanceOption2 = blockElement.querySelector('.attendance-option-2');
     const attendanceOption3 = blockElement.querySelector('.attendance-option-3');
     const visibilitySelect = blockElement.querySelector('select[name="visibility"]');
+    const heatmapConfig = blockElement.querySelector('.appointment-heatmap-config');
 
-    const template = blockData.template || 'p';
+    let template = blockData.template || 'p';
+    if (!['h1', 'h2', 'h3', 'p', 'code', 'attendance', 'secret_santa', 'appointment_heatmap', 'single_choice', 'multiple_choice', 'text_input', 'number_input', 'calendar'].includes(template)) {
+        try {
+            const legacyConfig = JSON.parse(blockData.content || '{}');
+            if (Array.isArray(legacyConfig.days) && legacyConfig.start && legacyConfig.end) {
+                template = 'appointment_heatmap';
+            }
+        } catch (_) { }
+    }
     typeSelect.value = template;
 
     // Handle content based on block type
@@ -118,6 +127,11 @@ function createInvitationBlock(blockId, blockData = {}) {
             if (blockData.options) optionsInput.value = blockData.options;
             if (blockData.visibility) visibilitySelect.value = blockData.visibility;
         }
+    } else if (template === 'appointment_heatmap') {
+        const config = parseHeatmapConfig(blockData.content);
+        contentTextarea.value = config.label;
+        visibilitySelect.value = config.public ? 'public' : 'private';
+        initializeHeatmapConfig(heatmapConfig, config);
     } else {
         // For non-question blocks, use content directly
         contentTextarea.value = blockData.content || '';
@@ -127,6 +141,10 @@ function createInvitationBlock(blockId, blockData = {}) {
         updateBlockVisibility(blockDiv, e.target.value);
         updateAttendanceAvailability();
         updateSecretSantaVisibility();
+        if (e.target.value === 'appointment_heatmap') {
+            visibilitySelect.value = 'public';
+            initializeHeatmapConfig(heatmapConfig, parseHeatmapConfig());
+        }
         if (e.target.value === 'secret_santa' && !secretSantaManagementInitialized && activePartyId) {
             setupSecretSanta(activePartyId, document, activePartyGuests, [{ template: 'secret_santa' }]);
         }
@@ -142,11 +160,12 @@ function createInvitationBlock(blockId, blockData = {}) {
 }
 
 function updateBlockVisibility(blockDiv, blockType) {
-    const optionsInput = blockDiv.querySelector('input[type="text"]');
+    const optionsInput = blockDiv.querySelector('#options');
     const attendanceOptionsDiv = blockDiv.querySelector('.attendance-options');
     const visibilitySelect = blockDiv.querySelector('select[name="visibility"]');
     const contentTextarea = blockDiv.querySelector('textarea');
     const secretSantaPreview = blockDiv.querySelector('.secret-santa-preview');
+    const heatmapConfig = blockDiv.querySelector('.appointment-heatmap-config');
 
     // Show attendance options only for attendance type
     if (attendanceOptionsDiv) {
@@ -157,7 +176,7 @@ function updateBlockVisibility(blockDiv, blockType) {
     const isChoiceQuestion = ['single_choice', 'multiple_choice'].includes(blockType);
     optionsInput.style.display = isChoiceQuestion ? 'block' : 'none';
 
-    const isQuestion = ['single_choice', 'multiple_choice', 'text_input', 'number_input', 'attendance'].includes(blockType);
+    const isQuestion = ['single_choice', 'multiple_choice', 'text_input', 'number_input', 'attendance', 'appointment_heatmap'].includes(blockType);
     visibilitySelect.style.display = isQuestion ? 'block' : 'none';
     
     // Hide textarea for calendar block (it doesn't need content)
@@ -166,6 +185,9 @@ function updateBlockVisibility(blockDiv, blockType) {
     }
     if (secretSantaPreview) {
         secretSantaPreview.style.display = blockType === 'secret_santa' ? 'block' : 'none';
+    }
+    if (heatmapConfig) {
+        heatmapConfig.style.display = blockType === 'appointment_heatmap' ? 'block' : 'none';
     }
 }
 
@@ -268,7 +290,7 @@ function rebuildBlockEditor(container) {
 function getBlockData(blockElement) {
     const typeSelect = blockElement.querySelector('.block-type-select');
     const contentTextarea = blockElement.querySelector('textarea');
-    const optionsInput = blockElement.querySelector('input[type="text"]');
+    const optionsInput = blockElement.querySelector('#options');
     const attendanceOption1 = blockElement.querySelector('.attendance-option-1');
     const attendanceOption2 = blockElement.querySelector('.attendance-option-2');
     const attendanceOption3 = blockElement.querySelector('.attendance-option-3');
@@ -303,6 +325,23 @@ function getBlockData(blockElement) {
         return {
             template: template,
             content: JSON.stringify({ label: 'Secret Santa' })
+        };
+    } else if (template === 'appointment_heatmap') {
+        const configElement = blockElement.querySelector('.appointment-heatmap-config');
+        const days = Array.from(configElement.querySelectorAll('.heatmap-day-row')).map(row => ({
+            date: row.querySelector('.heatmap-day-date').value,
+            unavailable: row.querySelector('.heatmap-day-unavailable').value
+                .split(',').map(interval => interval.trim()).filter(Boolean)
+        })).filter(day => day.date);
+        return {
+            template: template,
+            content: JSON.stringify({
+                label: rawContent,
+                public: visibility === 'public',
+                start: configElement.querySelector('.heatmap-start').value,
+                end: configElement.querySelector('.heatmap-end').value,
+                days
+            })
         };
     } else {
         return {
@@ -446,6 +485,55 @@ async function setupSecretSanta(partyId, fragment, guests, blocks) {
         else showToast((await response.json()).error || 'Failed to shuffle assignments', 'error');
     });
     try { await load(); } catch (_) { status.textContent = 'Failed to load assignments.'; }
+}
+
+function parseHeatmapConfig(content) {
+    try {
+        const config = typeof content === 'string' ? JSON.parse(content || '{}') : content;
+        return {
+            label: config.label || '',
+            public: config.public !== false,
+            start: config.start || '08:00',
+            end: config.end || '18:00',
+            days: Array.isArray(config.days) ? config.days : []
+        };
+    } catch (_) {
+        return { label: '', public: true, start: '08:00', end: '18:00', days: [] };
+    }
+}
+
+function initializeHeatmapConfig(configElement, config) {
+    if (!configElement) return;
+    configElement.querySelector('.heatmap-start').value = config.start;
+    configElement.querySelector('.heatmap-end').value = config.end;
+    const daysElement = configElement.querySelector('.heatmap-days');
+    daysElement.innerHTML = '';
+
+    const addDay = (day = {}) => {
+        const row = document.createElement('div');
+        row.className = 'heatmap-day-row';
+        const date = document.createElement('input');
+        date.type = 'date';
+        date.className = 'heatmap-day-date';
+        date.value = day.date || '';
+        date.setAttribute('aria-label', 'Day');
+        const unavailable = document.createElement('input');
+        unavailable.type = 'text';
+        unavailable.className = 'heatmap-day-unavailable';
+        unavailable.placeholder = 'Unavailable: 12:00-13:00, 16:00-16:30';
+        unavailable.value = Array.isArray(day.unavailable) ? day.unavailable.join(', ') : (day.unavailable || '');
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'heatmap-remove-day';
+        remove.textContent = 'Remove';
+        remove.addEventListener('click', () => row.remove());
+        row.append(date, unavailable, remove);
+        daysElement.appendChild(row);
+    };
+
+    config.days.forEach(addDay);
+    if (config.days.length === 0) addDay();
+    configElement.querySelector('.heatmap-add-day').addEventListener('click', () => addDay());
 }
 
 async function renderParty(partyId) {

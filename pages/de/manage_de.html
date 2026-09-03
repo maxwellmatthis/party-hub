@@ -8,7 +8,7 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/static/logo/favicon-16.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/static/logo/favicon-32.png">
     <link rel="icon" type="image/x-icon" href="/static/logo/favicon.ico">
-    <script src="/static/manage.js?v=20260903-10" defer></script>
+    <script src="/static/manage.js" defer></script>
     <link rel="stylesheet" href="/static/manage.css">
 
     <!-- Templates -->
@@ -149,6 +149,7 @@
                     <option value="code">Code</option>
                     <option value="attendance">Teilnahme</option>
                     <option value="secret_santa">Wichteln</option>
+                    <option value="appointment_heatmap">Termin-Heatmap</option>
                     <option value="single_choice">Einzelauswahl-Frage</option>
                     <option value="multiple_choice">Mehrfachauswahl-Frage</option>
                     <option value="text_input">Text-Frage</option>
@@ -157,6 +158,17 @@
                 </select>
                 <textarea name="text" id="content-or-label" placeholder="Inhalt oder Frage eingeben..."></textarea>
                 <div class="secret-santa-preview">Deine Wichtel-Zuordnung: &lt;Name&gt;</div>
+                <div class="appointment-heatmap-config">
+                    <label>Zeitraum</label>
+                    <div class="heatmap-time-range">
+                        <input type="time" class="heatmap-start" value="08:00">
+                        <span>bis</span>
+                        <input type="time" class="heatmap-end" value="18:00">
+                    </div>
+                    <label>Tage</label>
+                    <div class="heatmap-days"></div>
+                    <button type="button" class="heatmap-add-day">Tag hinzufügen</button>
+                </div>
                 <input type="text" id="options" placeholder="Option 1; Option 2; Option 3..." style="display: none;">
                 <div class="attendance-options" style="display: none;">
                     <label>Option 1: <input type="text" class="attendance-option-1" placeholder="Ja"></label>

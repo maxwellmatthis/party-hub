@@ -19,11 +19,9 @@ A modern, minimalistic party invitation platform built with Rust (Actix Web), SQ
   - [Option 2: Direct SMTP (Send directly from your server)](#option-2-direct-smtp-send-directly-from-your-server)
 - [License](#license)
 
-![Party Management Interface](examples/Party-Hub-Management.png)
-*Management interface for creating parties and managing guests*
+## Screenshots / Demo
 
-![Guest Invitation View](examples/Party-Hub-Invitation.png)
-*Guest-facing invitation with real-time statistics*
+For screenshots of PartyHub, please see [screenshots](./screenshots/).
 
 ## Features
 
@@ -54,6 +52,7 @@ A modern, minimalistic party invitation platform built with Rust (Actix Web), SQ
   - `{{name}}` - Full name (first + last) for backward compatibility
 - 🔐 **Secure Authentication**: Token-based authentication for party organizers
 - 🎅 **Secret Santa**: Automatically assign each guest to another guest.
+- 📅 **Appointment Heatmap**: Have everyone write down what time they are available and find the best time.
 
 ## Quick Start
 

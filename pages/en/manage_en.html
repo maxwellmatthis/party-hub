@@ -149,6 +149,7 @@
                     <option value="code">Code</option>
                     <option value="attendance">Attendance</option>
                     <option value="secret_santa">Secret Santa</option>
+                    <option value="appointment_heatmap">Appointment Heatmap</option>
                     <option value="single_choice">Single Choice Question</option>
                     <option value="multiple_choice">Multiple Choice Question</option>
                     <option value="text_input">Text Question</option>
@@ -157,6 +158,17 @@
                 </select>
                 <textarea name="text" id="content-or-label" placeholder="Enter content or question..."></textarea>
                 <div class="secret-santa-preview">Your Secret Santa assignment: &lt;name&gt;</div>
+                <div class="appointment-heatmap-config">
+                    <label>Time range</label>
+                    <div class="heatmap-time-range">
+                        <input type="time" class="heatmap-start" value="08:00">
+                        <span>to</span>
+                        <input type="time" class="heatmap-end" value="18:00">
+                    </div>
+                    <label>Days</label>
+                    <div class="heatmap-days"></div>
+                    <button type="button" class="heatmap-add-day">Add day</button>
+                </div>
                 <input type="text" id="options" placeholder="Option 1; Option 2; Option 3..." style="display: none;">
                 <div class="attendance-options" style="display: none;">
                     <label>Option 1: <input type="text" class="attendance-option-1" placeholder="Yes"></label>

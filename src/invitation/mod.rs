@@ -289,6 +289,7 @@ async fn details(
     let blocks_json =
         serde_json::from_str::<serde_json::Value>(&invitation_blocks).unwrap_or(json!([]));
     let mut public_block_ids = std::collections::HashSet::new();
+    let mut public_heatmap_ids = std::collections::HashSet::new();
     let mut attendance_block_id: Option<String> = None;
 
     if let Some(blocks_array) = blocks_json.as_array() {
@@ -314,6 +315,14 @@ async fn details(
                         {
                             public_block_ids.insert(block_id.to_string());
                         }
+                    }
+                    if block.get("template").and_then(|v| v.as_str()) == Some("appointment_heatmap")
+                        && serde_json::from_str::<serde_json::Value>(content.as_str().unwrap_or("{}"))
+                            .ok()
+                            .and_then(|value| value.get("public").and_then(|public| public.as_bool()))
+                            .unwrap_or(false)
+                    {
+                        public_heatmap_ids.insert(block_id.to_string());
                     }
                 }
             }
@@ -395,8 +404,9 @@ async fn details(
                             // For other blocks, only show if guest RSVP'd yes
                             let is_attendance_block =
                                 Some(block_id.as_str()) == attendance_block_id.as_deref();
+                            let is_public_heatmap = public_heatmap_ids.contains(block_id);
 
-                            if is_attendance_block || !has_rsvp_block || has_rsvped_yes {
+                            if is_attendance_block || is_public_heatmap || !has_rsvp_block || has_rsvped_yes {
                                 // Create answer object with guest name for public answers
                                 let answer_with_name = json!({
                                     "answer": answer,
