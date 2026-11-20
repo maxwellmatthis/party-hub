@@ -1,23 +1,32 @@
 use crate::config::AppConfig;
 use actix_web::web;
+use hickory_resolver::TokioResolver;
+use hickory_resolver::proto::rr::RData;
 use lettre::transport::smtp::client::{Tls, TlsParameters};
 use lettre::{Message, SmtpTransport, Transport};
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
-use hickory_resolver::TokioAsyncResolver;
 use uuid::Uuid;
 
 /// Get MX records for a domain, sorted by priority (lower number = higher priority)
 async fn get_mx_records(domain: &str) -> Result<Vec<(u16, String)>, String> {
-    let resolver = TokioAsyncResolver::tokio_from_system_conf()
+    let resolver = TokioResolver::builder_tokio()
+        .map_err(|e| format!("Failed to create DNS resolver: {}", e))?
+        .build()
         .map_err(|e| format!("Failed to create DNS resolver: {}", e))?;
 
-    let mx_records = resolver.mx_lookup(domain).await
+    let mx_records = resolver
+        .mx_lookup(domain)
+        .await
         .map_err(|e| format!("Failed to resolve MX records for {}: {}", domain, e))?;
 
     let mut records: Vec<(u16, String)> = mx_records
+        .answers()
         .iter()
-        .map(|mx| (mx.preference(), mx.exchange().to_utf8()))
+        .filter_map(|record| match &record.data {
+            RData::MX(mx) => Some((mx.preference, mx.exchange.to_utf8())),
+            _ => None,
+        })
         .collect();
 
     // Sort by priority (lower number = higher priority)
@@ -36,7 +45,9 @@ async fn send_email_direct(
     body: &str,
 ) -> Result<(), String> {
     // Extract domain from recipient email
-    let to_domain = to_email.split('@').nth(1)
+    let to_domain = to_email
+        .split('@')
+        .nth(1)
         .ok_or_else(|| "Invalid recipient email address".to_string())?;
 
     // Get MX records for the recipient's domain
@@ -47,10 +58,13 @@ async fn send_email_direct(
     }
 
     // Generate a unique Message-ID
-    let from_domain = from_addr.split('@').nth(1)
+    let from_domain = from_addr
+        .split('@')
+        .nth(1)
         .and_then(|s| s.split('>').next())
         .unwrap_or("localhost");
-    let message_id = format!("<{}.{}@{}>", 
+    let message_id = format!(
+        "<{}.{}@{}>",
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -61,8 +75,14 @@ async fn send_email_direct(
 
     // Create the email message with Message-ID header
     let message = Message::builder()
-        .from(from_addr.parse().map_err(|e| format!("Invalid from address: {}", e))?)
-        .to(to_addr.parse().map_err(|e| format!("Invalid to address: {}", e))?)
+        .from(
+            from_addr
+                .parse()
+                .map_err(|e| format!("Invalid from address: {}", e))?,
+        )
+        .to(to_addr
+            .parse()
+            .map_err(|e| format!("Invalid to address: {}", e))?)
         .subject(subject)
         .message_id(Some(message_id))
         .body(body.to_string())
@@ -78,19 +98,22 @@ async fn send_email_direct(
         {
             Ok(params) => params,
             Err(e) => {
-                eprintln!("[EMAIL] Failed to create TLS parameters for {}: {}", mx_host, e);
+                eprintln!(
+                    "[EMAIL] Failed to create TLS parameters for {}: {}",
+                    mx_host, e
+                );
                 continue;
             }
         };
 
         // Try to connect and send
         let mailer = match SmtpTransport::relay(&mx_host) {
-            Ok(builder) => builder
-                .tls(Tls::Opportunistic(tls))
-                .port(25)
-                .build(),
+            Ok(builder) => builder.tls(Tls::Opportunistic(tls)).port(25).build(),
             Err(e) => {
-                eprintln!("[EMAIL] Failed to create SMTP transport for {}: {}", mx_host, e);
+                eprintln!(
+                    "[EMAIL] Failed to create SMTP transport for {}: {}",
+                    mx_host, e
+                );
                 continue;
             }
         };
@@ -106,7 +129,10 @@ async fn send_email_direct(
         }
     }
 
-    Err(format!("Failed to send email via any MX server for {}", to_domain))
+    Err(format!(
+        "Failed to send email via any MX server for {}",
+        to_domain
+    ))
 }
 
 /// Sends emails to guests directly to their mail servers (requires SPF/DKIM setup)
@@ -124,8 +150,7 @@ pub async fn send_emails_direct(
         }
     };
 
-    let conn = db.get()
-        .map_err(|_| "Database connection failed")?;
+    let conn = db.get().map_err(|_| "Database connection failed")?;
 
     // Get email addresses for all guests
     let placeholders = guest_ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
@@ -134,7 +159,8 @@ pub async fn send_emails_direct(
         placeholders
     );
 
-    let mut stmt = conn.prepare(&query)
+    let mut stmt = conn
+        .prepare(&query)
         .map_err(|e| format!("Failed to prepare query: {}", e))?;
 
     let params: Vec<&dyn rusqlite::ToSql> = guest_ids
@@ -164,8 +190,7 @@ pub async fn send_emails_direct(
         let to_addr = format!("{} <{}>", recipient_name, email);
 
         match send_email_direct(smtp_from, &to_addr, &email, &subject, &body).await {
-            Ok(_) => {
-            }
+            Ok(_) => {}
             Err(e) => {
                 eprintln!("[EMAIL ERROR] Failed to send to {}: {}", email, e);
             }

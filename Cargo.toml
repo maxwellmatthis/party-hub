@@ -1,12 +1,13 @@
 [package]
 edition = "2024"
 name = "party-hub"
-version = "0.4.0"
+version = "0.4.1"
 
 [dependencies]
 actix-files = "0.6"
 actix-web = "4"
 chrono = "0.4"
+curl = { version = "0.4", default-features = false, features = ["rustls"] }
 hickory-resolver = "0.26"
 lettre = "0.11"
 r2d2 = "0.8.10"

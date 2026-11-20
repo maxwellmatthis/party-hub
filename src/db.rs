@@ -8,13 +8,13 @@ pub struct Party {
     pub name: String,
     pub author: String,
     pub invitation_blocks: String, // Store as JSON string for simplicity
-    pub date: String, // ISO 8601 date string
-    pub respond_until: String, // ISO 8601 date string
+    pub date: String,              // ISO 8601 date string
+    pub respond_until: String,     // ISO 8601 date string
     pub frozen: bool,
     pub public: bool,
     pub max_guests: i64,
     pub has_rsvp_block: bool,
-    pub duration: f64, // Duration in hours
+    pub duration: f64,    // Duration in hours
     pub location: String, // Party location/address
 }
 
@@ -142,11 +142,12 @@ impl Author {
 pub fn prepare_db(sqlite_db_path: &str) -> Result<()> {
     if let Some(parent) = Path::new(sqlite_db_path).parent() {
         if !parent.as_os_str().is_empty() {
-            std::fs::create_dir_all(parent)
-                .map_err(|error| rusqlite::Error::SqliteFailure(
+            std::fs::create_dir_all(parent).map_err(|error| {
+                rusqlite::Error::SqliteFailure(
                     rusqlite::ffi::Error::new(error.raw_os_error().unwrap_or(1)),
                     Some(error.to_string()),
-                ))?;
+                )
+            })?;
         }
     }
 

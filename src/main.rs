@@ -1,9 +1,9 @@
 use actix_files::NamedFile;
 use actix_web::{App, HttpResponse, HttpServer, get, web};
 mod config;
+use crate::config::{AppConfig, MailSendType};
 use db::prepare_db;
 use r2d2_sqlite::SqliteConnectionManager;
-use crate::config::{AppConfig, MailSendType};
 use std::fs;
 mod auth;
 mod db;

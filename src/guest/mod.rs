@@ -153,7 +153,11 @@ async fn delete_guest(
             .prepare("DELETE FROM guests WHERE id = ?1 AND author = ?2")
             .and_then(|mut stmt| stmt.execute([&guest_id, &author_id]));
 
-        match (delete_invitations_result, delete_assignments_result, delete_guest_result) {
+        match (
+            delete_invitations_result,
+            delete_assignments_result,
+            delete_guest_result,
+        ) {
             (Ok(_), Ok(_), Ok(rows_affected)) => {
                 if rows_affected > 0 {
                     tx.commit().unwrap();
@@ -243,9 +247,11 @@ async fn create_public_guest(
 
     let conn = match pool.get() {
         Ok(conn) => conn,
-        Err(_) => return HttpResponse::InternalServerError().json(json!({
-            "error": "Database connection failed"
-        })),
+        Err(_) => {
+            return HttpResponse::InternalServerError().json(json!({
+                "error": "Database connection failed"
+            }));
+        }
     };
 
     // Verify party exists and is public
@@ -263,7 +269,7 @@ async fn create_public_guest(
             if !is_public {
                 let error_msg = match language.as_str() {
                     "de" => "Diese Party ist nicht öffentlich",
-                    _ => "This party is not public"
+                    _ => "This party is not public",
                 };
                 return HttpResponse::Forbidden().json(json!({
                     "error": error_msg
@@ -274,7 +280,7 @@ async fn create_public_guest(
         Err(_) => {
             let error_msg = match language.as_str() {
                 "de" => "Party nicht gefunden",
-                _ => "Party not found"
+                _ => "Party not found",
             };
             return HttpResponse::NotFound().json(json!({
                 "error": error_msg
@@ -323,7 +329,9 @@ async fn create_public_guest(
                     let mut count = 0i64;
                     for answer_result in answer_iter {
                         if let Ok(answer_str) = answer_result {
-                            if let Ok(answer_json) = serde_json::from_str::<serde_json::Value>(&answer_str) {
+                            if let Ok(answer_json) =
+                                serde_json::from_str::<serde_json::Value>(&answer_str)
+                            {
                                 if let Some(attendance_answer) = answer_json.get(&attendance_id) {
                                     if let Some(answer_val) = attendance_answer.as_i64() {
                                         if answer_val == 0 {
@@ -352,7 +360,7 @@ async fn create_public_guest(
         if yes_count >= max_guests {
             let error_msg = match language.as_str() {
                 "de" => "Diese Party hat die maximale Anzahl an Gästen erreicht",
-                _ => "This party has reached its maximum number of guests"
+                _ => "This party has reached its maximum number of guests",
             };
             return HttpResponse::Forbidden().json(json!({
                 "error": error_msg

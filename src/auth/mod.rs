@@ -1,6 +1,6 @@
+use crate::config::AppConfig;
 use crate::db::Author;
 use crate::detect_language;
-use crate::config::AppConfig;
 use actix_web::{
     HttpResponse, Responder, Scope,
     cookie::{Cookie, SameSite},

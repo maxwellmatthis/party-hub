@@ -61,9 +61,7 @@ pub async fn web_push_subscribe(
              VALUES (?1, ?2, ?3, ?4) 
              ON CONFLICT(endpoint) DO UPDATE SET p256dh = ?3, auth = ?4",
         )
-        .and_then(|mut stmt| {
-            stmt.execute([&sub_id, &form.endpoint, &form.p256dh, &form.auth])
-        });
+        .and_then(|mut stmt| stmt.execute([&sub_id, &form.endpoint, &form.p256dh, &form.auth]));
 
     if let Err(e) = result {
         eprintln!(
@@ -272,7 +270,7 @@ pub async fn send_push(
             }
         };
 
-       match client.send(message).await {
+        match client.send(message).await {
             Ok(_) => {}
             Err(_e) => {}
         }

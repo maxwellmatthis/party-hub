@@ -1,13 +1,13 @@
-mod web_push;
 mod smtp_client;
 mod smtp_server;
+mod web_push;
 
 use crate::config::{AppConfig, MailSendType};
 use actix_web::{Scope, web};
 
-pub use web_push::{get_vapid_public_key, web_push_subscribe, associate_guest, send_push};
 pub use smtp_client::send_emails_via_client;
 pub use smtp_server::send_emails_direct;
+pub use web_push::{associate_guest, get_vapid_public_key, send_push, web_push_subscribe};
 
 /// Main email sending function that chooses between client and direct sending
 pub async fn send_emails(

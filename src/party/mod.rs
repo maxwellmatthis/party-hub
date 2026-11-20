@@ -11,10 +11,7 @@ use std::fs;
 use uuid::Uuid;
 
 #[get("/")]
-pub async fn home(
-    req: actix_web::HttpRequest,
-    config: web::Data<AppConfig>,
-) -> impl Responder {
+pub async fn home(req: actix_web::HttpRequest, config: web::Data<AppConfig>) -> impl Responder {
     // Detect language from Accept-Language header
     let language = detect_language(&req);
 
@@ -311,31 +308,34 @@ async fn update_party(
                 let max_guests = form.max_guests.unwrap_or(0);
 
                 // Validate attendance blocks: parse the JSON and count attendance blocks
-                let has_rsvp_block = match serde_json::from_str::<Vec<serde_json::Value>>(invitation_blocks) {
-                    Ok(blocks) => {
-                        let attendance_count = blocks.iter()
-                            .filter(|block| {
-                                block.get("template")
-                                    .and_then(|t| t.as_str())
-                                    .map(|t| t == "attendance")
-                                    .unwrap_or(false)
-                            })
-                            .count();
+                let has_rsvp_block =
+                    match serde_json::from_str::<Vec<serde_json::Value>>(invitation_blocks) {
+                        Ok(blocks) => {
+                            let attendance_count = blocks
+                                .iter()
+                                .filter(|block| {
+                                    block
+                                        .get("template")
+                                        .and_then(|t| t.as_str())
+                                        .map(|t| t == "attendance")
+                                        .unwrap_or(false)
+                                })
+                                .count();
 
-                        if attendance_count > 1 {
+                            if attendance_count > 1 {
+                                return HttpResponse::BadRequest().json(json!({
+                                    "error": "Only one attendance block is allowed per party"
+                                }));
+                            }
+
+                            attendance_count == 1
+                        }
+                        Err(_) => {
                             return HttpResponse::BadRequest().json(json!({
-                                "error": "Only one attendance block is allowed per party"
+                                "error": "Invalid invitation_blocks JSON"
                             }));
                         }
-
-                        attendance_count == 1
-                    }
-                    Err(_) => {
-                        return HttpResponse::BadRequest().json(json!({
-                            "error": "Invalid invitation_blocks JSON"
-                        }));
-                    }
-                };
+                    };
 
                 let result = conn
                     .prepare("UPDATE parties SET name = ?1, invitation_blocks = ?2, date = ?3, duration = ?4, location = ?5, respond_until = ?6, frozen = ?7, public = ?8, max_guests = ?9, has_rsvp_block = ?10 WHERE id = ?11 AND author = ?12")
@@ -370,25 +370,28 @@ async fn update_party(
 
                                     // Send push notifications
                                     if !guest_invitation_map.is_empty() {
-                                        let notification_content = format!("Update regarding {}: {}", form.name, changelog_limited);
-                                        
+                                        let notification_content = format!(
+                                            "Update regarding {}: {}",
+                                            form.name, changelog_limited
+                                        );
+
                                         // Send push notifications
                                         let _ = crate::notification::send_push(
                                             pool.clone(),
                                             config.as_ref(),
                                             notification_content.clone(),
                                             guest_invitation_map.clone(),
-                                        ).await;
-                                        
+                                        )
+                                        .await;
+
                                         // Send emails individually with correct invitation links
                                         let email_subject = format!("Party Update: {}", form.name);
                                         let base_url = config.base_url.as_str();
-                                        
+
                                         for (guest_id, invitation_id) in guest_invitation_map {
-                                            let email_body = format!("{}\n\nView your invitation at: {}/{}", 
-                                                changelog_limited,
-                                                base_url,
-                                                invitation_id
+                                            let email_body = format!(
+                                                "{}\n\nView your invitation at: {}/{}",
+                                                changelog_limited, base_url, invitation_id
                                             );
                                             let _ = crate::notification::send_emails(
                                                 pool.clone(),
@@ -396,7 +399,8 @@ async fn update_party(
                                                 email_subject.clone(),
                                                 email_body,
                                                 vec![guest_id],
-                                            ).await;
+                                            )
+                                            .await;
                                         }
                                     }
                                 }
@@ -466,7 +470,11 @@ async fn delete_party(
                     .prepare("DELETE FROM parties WHERE id = ?1 AND author = ?2")
                     .and_then(|mut stmt| stmt.execute([&party_id, &author_id]));
 
-                match (delete_invitations_result, delete_assignments_result, delete_party_result) {
+                match (
+                    delete_invitations_result,
+                    delete_assignments_result,
+                    delete_party_result,
+                ) {
                     (Ok(_), Ok(_), Ok(rows_affected)) => {
                         if rows_affected > 0 {
                             tx.commit().unwrap();
@@ -567,25 +575,32 @@ async fn add_guest_to_party(
                                         // Get party name for notification
                                         let party_name: String = conn
                                             .prepare("SELECT name FROM parties WHERE id = ?1")
-                                            .and_then(|mut stmt| stmt.query_row([&party_id], |row| row.get(0)))
+                                            .and_then(|mut stmt| {
+                                                stmt.query_row([&party_id], |row| row.get(0))
+                                            })
                                             .unwrap_or_else(|_| "a party".to_string());
 
                                         // Send push notification to the guest
-                                        let mut guest_invitation_map = std::collections::HashMap::new();
-                                        guest_invitation_map.insert(guest_id.clone(), invitation_id.clone());
-                                        
-                                        let notification_content = format!("You've been invited to {}!", party_name);
+                                        let mut guest_invitation_map =
+                                            std::collections::HashMap::new();
+                                        guest_invitation_map
+                                            .insert(guest_id.clone(), invitation_id.clone());
+
+                                        let notification_content =
+                                            format!("You've been invited to {}!", party_name);
                                         let _ = crate::notification::send_push(
                                             pool.clone(),
                                             config.as_ref(),
                                             notification_content.clone(),
                                             guest_invitation_map,
-                                        ).await;
+                                        )
+                                        .await;
 
                                         // Send email notification
-                                        let email_subject = format!("You've been invited to {}", party_name);
+                                        let email_subject =
+                                            format!("You've been invited to {}", party_name);
                                         let email_body = format!(
-                                            "You've been invited to {}!\n\nView your invitation at: {}/{}", 
+                                            "You've been invited to {}!\n\nView your invitation at: {}/{}",
                                             party_name,
                                             config.base_url.as_str(),
                                             invitation_id
@@ -596,11 +611,13 @@ async fn add_guest_to_party(
                                             email_subject,
                                             email_body,
                                             vec![guest_id.clone()],
-                                        ).await;
+                                        )
+                                        .await;
 
                                         HttpResponse::Ok().json(json!({"status": "success", "message": "Guest added to party"}))
-                                    },
-                                    Err(_) => HttpResponse::InternalServerError().json(json!({"error": "Failed to add guest to party"}))
+                                    }
+                                    Err(_) => HttpResponse::InternalServerError()
+                                        .json(json!({"error": "Failed to add guest to party"})),
                                 }
                             }
                             Ok(true) => HttpResponse::Conflict()
@@ -663,7 +680,8 @@ async fn remove_guest_from_party(
                     }
                     _ => {
                         tx.rollback().unwrap();
-                        HttpResponse::InternalServerError().json(json!({"error": "Failed to remove guest from party"}))
+                        HttpResponse::InternalServerError()
+                            .json(json!({"error": "Failed to remove guest from party"}))
                     }
                 }
             }
@@ -770,7 +788,9 @@ async fn get_secret_santa_assignments(
     let party_id = path.into_inner();
     let author_id = match is_authenticated_as_author(&req, &pool) {
         Some(id) => id,
-        None => return HttpResponse::Unauthorized().json(json!({"error": "Authentication required"})),
+        None => {
+            return HttpResponse::Unauthorized().json(json!({"error": "Authentication required"}));
+        }
     };
     match verify_party_ownership(&pool, &party_id, &author_id) {
         Ok(true) => {
@@ -793,10 +813,13 @@ async fn get_secret_santa_assignments(
             });
             match result {
                 Ok(assignments) => HttpResponse::Ok().json(assignments),
-                Err(_) => HttpResponse::InternalServerError().json(json!({"error": "Failed to fetch assignments"})),
+                Err(_) => HttpResponse::InternalServerError()
+                    .json(json!({"error": "Failed to fetch assignments"})),
             }
         }
-        Ok(false) => HttpResponse::Forbidden().json(json!({"error": "Party not found or access denied"})),
+        Ok(false) => {
+            HttpResponse::Forbidden().json(json!({"error": "Party not found or access denied"}))
+        }
         Err(_) => HttpResponse::InternalServerError().json(json!({"error": "Database error"})),
     }
 }
@@ -810,22 +833,45 @@ async fn shuffle_secret_santa(
     let party_id = path.into_inner();
     let author_id = match is_authenticated_as_author(&req, &pool) {
         Some(id) => id,
-        None => return HttpResponse::Unauthorized().json(json!({"error": "Authentication required"})),
+        None => {
+            return HttpResponse::Unauthorized().json(json!({"error": "Authentication required"}));
+        }
     };
-    if !matches!(verify_party_ownership(&pool, &party_id, &author_id), Ok(true)) {
-        return HttpResponse::Forbidden().json(json!({"error": "Party not found or access denied"}));
+    if !matches!(
+        verify_party_ownership(&pool, &party_id, &author_id),
+        Ok(true)
+    ) {
+        return HttpResponse::Forbidden()
+            .json(json!({"error": "Party not found or access denied"}));
     }
     let conn = pool.get().unwrap();
-    let guests = conn.prepare("SELECT guest_id FROM invitations WHERE party_id = ?1 ORDER BY random()")
-        .and_then(|mut stmt| stmt.query_map([&party_id], |row| row.get::<_, String>(0)).map(|rows| rows.filter_map(|row| row.ok()).collect::<Vec<_>>()));
+    let guests = conn
+        .prepare("SELECT guest_id FROM invitations WHERE party_id = ?1 ORDER BY random()")
+        .and_then(|mut stmt| {
+            stmt.query_map([&party_id], |row| row.get::<_, String>(0))
+                .map(|rows| rows.filter_map(|row| row.ok()).collect::<Vec<_>>())
+        });
     let guests = match guests {
         Ok(guests) if guests.len() >= 2 => guests,
-        Ok(_) => return HttpResponse::BadRequest().json(json!({"error": "At least two guests are required"})),
-        Err(_) => return HttpResponse::InternalServerError().json(json!({"error": "Failed to fetch guests"})),
+        Ok(_) => {
+            return HttpResponse::BadRequest()
+                .json(json!({"error": "At least two guests are required"}));
+        }
+        Err(_) => {
+            return HttpResponse::InternalServerError()
+                .json(json!({"error": "Failed to fetch guests"}));
+        }
     };
     let tx = conn.unchecked_transaction().unwrap();
-    if tx.execute("DELETE FROM secret_santa_assignments WHERE party_id = ?1", [&party_id]).is_err() {
-        return HttpResponse::InternalServerError().json(json!({"error": "Failed to clear assignments"}));
+    if tx
+        .execute(
+            "DELETE FROM secret_santa_assignments WHERE party_id = ?1",
+            [&party_id],
+        )
+        .is_err()
+    {
+        return HttpResponse::InternalServerError()
+            .json(json!({"error": "Failed to clear assignments"}));
     }
     for (index, giver_id) in guests.iter().enumerate() {
         let receiver_id = &guests[(index + 1) % guests.len()];
@@ -856,29 +902,42 @@ async fn update_secret_santa_assignment(
     let party_id = path.into_inner();
     let author_id = match is_authenticated_as_author(&req, &pool) {
         Some(id) => id,
-        None => return HttpResponse::Unauthorized().json(json!({"error": "Authentication required"})),
+        None => {
+            return HttpResponse::Unauthorized().json(json!({"error": "Authentication required"}));
+        }
     };
-    if !matches!(verify_party_ownership(&pool, &party_id, &author_id), Ok(true)) {
-        return HttpResponse::Forbidden().json(json!({"error": "Party not found or access denied"}));
+    if !matches!(
+        verify_party_ownership(&pool, &party_id, &author_id),
+        Ok(true)
+    ) {
+        return HttpResponse::Forbidden()
+            .json(json!({"error": "Party not found or access denied"}));
     }
     if form.giver_id == form.receiver_id {
-        return HttpResponse::BadRequest().json(json!({"error": "A guest cannot be assigned to themselves"}));
+        return HttpResponse::BadRequest()
+            .json(json!({"error": "A guest cannot be assigned to themselves"}));
     }
     let conn = pool.get().unwrap();
-    let member_count = conn.query_row(
-        "SELECT count(*) FROM invitations WHERE party_id = ?1 AND guest_id IN (?2, ?3)",
-        rusqlite::params![&party_id, &form.giver_id, &form.receiver_id], |row| row.get::<_, i64>(0)
-    ).unwrap_or(0);
+    let member_count = conn
+        .query_row(
+            "SELECT count(*) FROM invitations WHERE party_id = ?1 AND guest_id IN (?2, ?3)",
+            rusqlite::params![&party_id, &form.giver_id, &form.receiver_id],
+            |row| row.get::<_, i64>(0),
+        )
+        .unwrap_or(0);
     if member_count != 2 {
-        return HttpResponse::BadRequest().json(json!({"error": "Both guests must belong to this party"}));
+        return HttpResponse::BadRequest()
+            .json(json!({"error": "Both guests must belong to this party"}));
     }
     match conn.execute(
         "INSERT INTO secret_santa_assignments (party_id, giver_id, receiver_id) VALUES (?1, ?2, ?3)
          ON CONFLICT(party_id, giver_id) DO UPDATE SET receiver_id = excluded.receiver_id",
-        rusqlite::params![&party_id, &form.giver_id, &form.receiver_id]
+        rusqlite::params![&party_id, &form.giver_id, &form.receiver_id],
     ) {
         Ok(_) => HttpResponse::Ok().json(json!({"status": "success"})),
-        Err(_) => HttpResponse::InternalServerError().json(json!({"error": "Failed to save assignment"})),
+        Err(_) => {
+            HttpResponse::InternalServerError().json(json!({"error": "Failed to save assignment"}))
+        }
     }
 }
 
