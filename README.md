@@ -17,6 +17,7 @@ A modern, minimalistic party invitation platform built with Rust (Actix Web), SQ
 - [Email Notifications Setup (Optional)](#email-notifications-setup-optional)
   - [Option 1: SMTP Client (Using your email provider)](#option-1-smtp-client-using-your-email-provider)
   - [Option 2: Direct SMTP (Send directly from your server)](#option-2-direct-smtp-send-directly-from-your-server)
+- [Docker Container](#docker-container)
 - [License](#license)
 
 ## Screenshots / Demo
@@ -63,6 +64,8 @@ For screenshots of PartyHub, please see [screenshots](./screenshots/).
 - NPX
 
 ### Installation & Setup
+
+[__Install via Docker__](#docker-container)
 
 1. **Clone**:
 
@@ -251,6 +254,86 @@ mail server or you do not run a mail server for your chosen domain but would lik
     - Without proper SPF/DKIM/DMARC, your emails will likely end up in spam
     - Major email providers (Gmail, Outlook) require DKIM for good deliverability
     - Consider using Option 1 (SMTP Client) if DNS configuration is too complex
+
+## Docker Container
+
+Party Hub is published on Docker Hub as [`maxwellmatthis/party-hub`](https://hub.docker.com/repository/docker/maxwellmatthis/party-hub/general).
+
+### Build
+
+Build the image from the repository root:
+
+```bash
+docker build -t maxwellmatthis/party-hub:latest .
+```
+
+### Push
+
+Log in to Docker Hub and push the image:
+
+```bash
+docker login
+docker push maxwellmatthis/party-hub:latest
+```
+
+### Run
+
+Generate or provide matching public and private VAPID key files, then run the container. The named volume keeps the SQLite database between restarts and container replacements:
+
+```bash
+npx --yes web-push generate-vapid-keys
+# Save the publicKey to ./public_vapid_key.pem
+# Save the privateKey to ./private_vapid_key.pem
+
+docker run -d \
+  --name party-hub \
+  --restart unless-stopped \
+  -p 8080:8080 \
+  -e ENV=prod \
+  -e BASE_URL=https://party.example.com \
+  -v party-hub-data:/data \
+  -v "$(pwd)/public_vapid_key.pem:/run/party-hub/public_vapid_key.pem:ro" \
+  -v "$(pwd)/private_vapid_key.pem:/run/party-hub/private_vapid_key.pem:ro" \
+  maxwellmatthis/party-hub:latest
+```
+
+Set `BASE_URL` to the public URL used to reach Party Hub. Add optional SMTP variables with further `-e` arguments if email notifications are enabled.
+
+View application output with:
+
+```bash
+docker logs -f party-hub
+```
+
+Stop or remove the container with:
+
+```bash
+docker stop party-hub
+docker rm party-hub
+```
+
+The database remains in the `party-hub-data` named volume, so recreating the container with the same volume preserves all application data.
+
+### Create an author while the container is running
+
+The container includes `createAuthor.sh`. Run it through the container and keep Party Hub running:
+
+```bash
+docker exec party-hub ./createAuthor.sh "Your Name"
+```
+
+Example output:
+
+```text
+✅ Author 'Your Name' created successfully!
+📋 Author ID: 6f7f9b3f-2d2a-4f4d-a6e1-8a9cde12a456
+🔑 Author Secret: 2f6d4e4a7c...
+
+Save this secret! You'll need it to log in to the Party Hub management interface.
+You can access the application at: http://localhost:8080
+```
+
+The secret is shown only when the author is created. Save it immediately and use it to log in to the management interface.
 
 ## License
 

@@ -67,7 +67,7 @@ fn detect_language(req: &actix_web::HttpRequest) -> String {
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let config = AppConfig::from_env();
-    prepare_db().expect("FATAL: Unable to set up DB!");
+    prepare_db(&config.sqlite_db_path).expect("FATAL: Unable to set up DB!");
     let manager = SqliteConnectionManager::file(&config.sqlite_db_path);
     let pool = r2d2::Pool::new(manager).unwrap();
 
@@ -162,7 +162,7 @@ async fn main() -> std::io::Result<()> {
             .service(invitation::register)
             .service(invitation::invitation_page)
     })
-    .bind(("127.0.0.1", config.port))?
+    .bind(("0.0.0.0", config.port))?
     .run()
     .await
 }

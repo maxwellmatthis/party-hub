@@ -1,5 +1,6 @@
 use rusqlite::{Connection, Result, Row};
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Party {
@@ -138,8 +139,18 @@ impl Author {
     }
 }
 
-pub fn prepare_db() -> Result<()> {
-    let conn = Connection::open("./party.db")?;
+pub fn prepare_db(sqlite_db_path: &str) -> Result<()> {
+    if let Some(parent) = Path::new(sqlite_db_path).parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent)
+                .map_err(|error| rusqlite::Error::SqliteFailure(
+                    rusqlite::ffi::Error::new(error.raw_os_error().unwrap_or(1)),
+                    Some(error.to_string()),
+                ))?;
+        }
+    }
+
+    let conn = Connection::open(sqlite_db_path)?;
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS parties (
