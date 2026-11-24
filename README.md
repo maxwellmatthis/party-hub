@@ -257,7 +257,7 @@ mail server or you do not run a mail server for your chosen domain but would lik
 
 ## Docker Container
 
-Party Hub is published on Docker Hub as [`maxwellmatthis/party-hub`](https://hub.docker.com/repository/docker/maxwellmatthis/party-hub/general).
+Party Hub is published on Docker Hub as [`maxwellmatthis/party-hub`](https://hub.docker.com/r/maxwellmatthis/party-hub).
 
 ### Build
 
