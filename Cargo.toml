@@ -1,7 +1,7 @@
 [package]
 edition = "2024"
 name = "party-hub"
-version = "0.4.1"
+version = "0.4.2"
 
 [dependencies]
 actix-files = "0.6"

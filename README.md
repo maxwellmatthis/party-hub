@@ -129,10 +129,13 @@ Party Hub supports the following environment variables for configuration:
 
 ### Required
 
-- **`PUBLIC_VAPID_KEY_PATH`**: Path to public web-push key.
-- **`PRIVATE_VAPID_KEY_PATH`**: Path to private web-push key.
+- **`PUBLIC_VAPID_KEY`**: Public web-push key (optional if `PUBLIC_VAPID_KEY_PATH` is set).
+- **`PRIVATE_VAPID_KEY`**: Private web-push key (optional if `PRIVATE_VAPID_KEY_PATH` is set).
 - **`SQLITE_DB_PATH`**: Path to sqlite database.
 - **`WEB_ASSETS_PATH`**: Path to static assets to be served to the web.
+
+The VAPID key environment variables take precedence. If either key is not set,
+the corresponding `*_VAPID_KEY_PATH` variable is used to load the key from a file.
 
 ### Customization
 

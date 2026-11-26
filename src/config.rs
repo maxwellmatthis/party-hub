@@ -5,8 +5,8 @@ pub struct AppConfig {
     pub web_assets_path: String,
     pub sqlite_db_path: String,
     pub base_url: String,
-    pub public_vapid_key_path: String,
-    pub private_vapid_key_path: String,
+    pub public_vapid_key: String,
+    pub private_vapid_key: String,
     pub smtp_server: Option<String>,
     pub smtp_username: Option<String>,
     pub smtp_password: Option<String>,
@@ -31,12 +31,8 @@ impl AppConfig {
         let sqlite_db_path =
             env::var("SQLITE_DB_PATH").expect("Environment variable SQLITE_DB_PATH must be set.");
         let base_url = env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
-        let public_vapid_key_path = env::var("PUBLIC_VAPID_KEY_PATH").expect(
-            "Environment variable PUBLIC_VAPID_KEY_PATH must be set for notifications to work.",
-        );
-        let private_vapid_key_path = env::var("PRIVATE_VAPID_KEY_PATH").expect(
-            "Environment variable PRIVATE_VAPID_KEY_PATH must be set for notifications to work.",
-        );
+        let public_vapid_key = load_vapid_key("PUBLIC_VAPID_KEY", "PUBLIC_VAPID_KEY_PATH");
+        let private_vapid_key = load_vapid_key("PRIVATE_VAPID_KEY", "PRIVATE_VAPID_KEY_PATH");
         let smtp_server = env::var("SMTP_SERVER").ok();
         let smtp_username = env::var("SMTP_USERNAME").ok();
         let smtp_password = env::var("SMTP_PASSWORD").ok();
@@ -62,8 +58,8 @@ impl AppConfig {
             web_assets_path,
             sqlite_db_path,
             base_url,
-            public_vapid_key_path,
-            private_vapid_key_path,
+            public_vapid_key,
+            private_vapid_key,
             smtp_server,
             smtp_username,
             smtp_password,
@@ -92,6 +88,18 @@ impl AppConfig {
     pub fn static_path(&self, relative_path: &str) -> String {
         join_path(&self.web_assets_path, "static", relative_path)
     }
+}
+
+fn load_vapid_key(key_env: &str, path_env: &str) -> String {
+    let key = env::var(key_env).unwrap_or_else(|_| {
+        let path = env::var(path_env).unwrap_or_else(|_| {
+            panic!("Environment variable {key_env} or {path_env} must be set.")
+        });
+        std::fs::read_to_string(&path)
+            .unwrap_or_else(|error| panic!("Failed to read VAPID key from {path}: {error}"))
+    });
+
+    key.trim().to_string()
 }
 
 fn join_path(base_path: &str, directory: &str, relative_path: &str) -> String {

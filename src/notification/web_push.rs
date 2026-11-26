@@ -27,15 +27,9 @@ pub struct AssociateGuestRequest {
 /// Returns the VAPID public key for web push subscriptions
 #[get("/vapid-public-key")]
 pub async fn get_vapid_public_key(config: web::Data<AppConfig>) -> impl Responder {
-    match std::fs::read_to_string(&config.public_vapid_key_path) {
-        Ok(key) => HttpResponse::Ok().json(json!({
-            "publicKey": key.trim()
-        })),
-        Err(e) => {
-            eprintln!("[FILE ERROR] Failed to read VAPID public key: {}", e);
-            HttpResponse::InternalServerError().finish()
-        }
-    }
+    HttpResponse::Ok().json(json!({
+        "publicKey": config.public_vapid_key
+    }))
 }
 
 /// Stores a web push subscription for a user
@@ -163,13 +157,7 @@ pub async fn send_push(
         Err(_) => return HttpResponse::InternalServerError().finish(),
     };
 
-    let private_key = match std::fs::read_to_string(&config.private_vapid_key_path) {
-        Ok(key) => key.trim().to_string(),
-        Err(e) => {
-            eprintln!("[FILE ERROR] Failed to read VAPID key: {}", e);
-            return HttpResponse::InternalServerError().finish();
-        }
-    };
+    let private_key = &config.private_vapid_key;
 
     // Build query with placeholders for all guest_ids
     let guest_ids: Vec<String> = guest_invitation_map.keys().cloned().collect();
