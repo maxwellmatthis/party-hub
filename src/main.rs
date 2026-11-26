@@ -5,6 +5,7 @@ use crate::config::{AppConfig, MailSendType};
 use db::prepare_db;
 use r2d2_sqlite::SqliteConnectionManager;
 use std::fs;
+mod admin;
 mod auth;
 mod db;
 mod guest;
@@ -152,6 +153,7 @@ async fn main() -> std::io::Result<()> {
             .service(serve_manifest)
             .service(serve_favicon)
             .service(serve_static)
+            .service(admin::subroutes())
             .service(auth::subroutes())
             .service(guest::subroutes())
             .service(notification::subroutes())

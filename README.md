@@ -140,6 +140,7 @@ the corresponding `*_VAPID_KEY_PATH` variable is used to load the key from a fil
 ### Customization
 
 - **`PORT`**: Set the server port (default: 8080)
+- **`ADMIN_TOKEN`**: Optional token for creating authors at `/admin`; set a value longer than 10 characters to enable author creation. An unset or empty token disables it.
 - **`ENV`**: Set the environment mode (default: "prod")
   - `ENV=dev`: Enables development mode with insecure cookies for localhost testing
   - `ENV=prod`: Production mode with secure cookies (default)

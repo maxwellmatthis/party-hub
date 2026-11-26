@@ -7,6 +7,7 @@ pub struct AppConfig {
     pub base_url: String,
     pub public_vapid_key: String,
     pub private_vapid_key: String,
+    pub admin_token: String,
     pub smtp_server: Option<String>,
     pub smtp_username: Option<String>,
     pub smtp_password: Option<String>,
@@ -33,6 +34,7 @@ impl AppConfig {
         let base_url = env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
         let public_vapid_key = load_vapid_key("PUBLIC_VAPID_KEY", "PUBLIC_VAPID_KEY_PATH");
         let private_vapid_key = load_vapid_key("PRIVATE_VAPID_KEY", "PRIVATE_VAPID_KEY_PATH");
+        let admin_token = env::var("ADMIN_TOKEN").unwrap_or(String::from(""));
         let smtp_server = env::var("SMTP_SERVER").ok();
         let smtp_username = env::var("SMTP_USERNAME").ok();
         let smtp_password = env::var("SMTP_PASSWORD").ok();
@@ -60,6 +62,7 @@ impl AppConfig {
             base_url,
             public_vapid_key,
             private_vapid_key,
+            admin_token,
             smtp_server,
             smtp_username,
             smtp_password,
